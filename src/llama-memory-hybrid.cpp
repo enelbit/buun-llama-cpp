@@ -1,5 +1,4 @@
 #include "llama-memory-hybrid.h"
-#include "llama-io.h"
 
 #include "llama-impl.h"
 #include "llama-model.h"
@@ -31,7 +30,7 @@ llama_memory_hybrid::llama_memory_hybrid(
                             /* layer filters */
     const layer_filter_cb & filter_attn,
     const layer_filter_cb & filter_recr,
-    const llama_memory_vbr_params & vbr) :
+                     size_t kv_stream_stage_bytes) :
     hparams(model.hparams),
     mem_attn(new llama_kv_cache(
         model,
@@ -52,7 +51,7 @@ llama_memory_hybrid::llama_memory_hybrid(
             : filter_attn,
         nullptr,
         nullptr,
-        vbr
+        kv_stream_stage_bytes
     )),
     mem_recr(new llama_memory_recurrent(
         model,
@@ -77,10 +76,7 @@ llama_memory_context_ptr llama_memory_hybrid::init_batch(llama_batch_allocr & ba
         while (true) {
             llama_ubatch ubatch;
 
-            // DFlash target models need per-seq ubatches so the per-ubatch slot
-            // switch in llama_context::decode() can route hidden-state capture
-            // and tape writes to the correct slot.
-            if (embd_all || force_split_seq) {
+            if (embd_all) {
                 // if all tokens are output, split by sequence
                 ubatch = balloc.split_seq(n_ubatch);
             } else {
@@ -147,74 +143,17 @@ void llama_memory_hybrid::clear(bool data) {
 }
 
 bool llama_memory_hybrid::seq_rm(llama_seq_id seq_id, llama_pos p0, llama_pos p1) {
-    // Try removing from the recurrent cache first since a bounded rollback may
-    // be rejected without mutation. Keep the attention and recurrent children
-    // on the same timeline when that happens.
+    // Try removing from the recurrent cache first since it may fail. If it does
+    // fail, the cache will not have been mutated.
     if (!mem_recr->seq_rm(seq_id, p0, p1)) {
         return false;
     }
     return mem_attn->seq_rm(seq_id, p0, p1);
-}
-
-bool llama_memory_hybrid::seq_rm_attn(
-        llama_seq_id seq_id,
-        llama_pos    p0,
-        llama_pos    p1) {
-    return mem_attn->seq_rm(seq_id, p0, p1);
-}
-
-bool llama_memory_hybrid::seq_rm_transient(llama_seq_id seq_id, llama_pos p0, llama_pos p1) {
-    if (!mem_recr->seq_rm(seq_id, p0, p1)) {
-        return false;
-    }
-    return mem_attn->seq_rm_transient(seq_id, p0, p1);
-}
-
-bool llama_memory_hybrid::seq_rm_attn_transient(
-        llama_seq_id seq_id, llama_pos p0, llama_pos p1) {
-    return mem_attn->seq_rm_attn_transient(seq_id, p0, p1);
 }
 
 void llama_memory_hybrid::seq_cp(llama_seq_id seq_id_src, llama_seq_id seq_id_dst, llama_pos p0, llama_pos p1) {
-    (void) try_seq_cp(seq_id_src, seq_id_dst, p0, p1);
-}
-
-bool llama_memory_hybrid::try_seq_cp(
-        llama_seq_id seq_id_src,
-        llama_seq_id seq_id_dst,
-        llama_pos    p0,
-        llama_pos    p1) {
-    // Keep the established success-path ordering. If either child reports failure,
-    // invalidate the composite destination so it can never expose a split timeline.
-    if (mem_attn->try_seq_cp(seq_id_src, seq_id_dst, p0, p1) &&
-        mem_recr->try_seq_cp(seq_id_src, seq_id_dst, p0, p1)) {
-        return true;
-    }
-
-    const bool removed_recr = mem_recr->seq_rm(seq_id_dst, -1, -1);
-    const bool removed_attn = mem_attn->seq_rm(seq_id_dst, -1, -1);
-    GGML_ASSERT(removed_recr && removed_attn);
-    GGML_UNUSED(removed_recr);
-    GGML_UNUSED(removed_attn);
-    return false;
-}
-
-bool llama_memory_hybrid::try_seq_cp_transient(
-        llama_seq_id seq_id_src,
-        llama_seq_id seq_id_dst,
-        llama_pos    p0,
-        llama_pos    p1) {
-    if (mem_attn->try_seq_cp_transient(seq_id_src, seq_id_dst, p0, p1) &&
-        mem_recr->try_seq_cp(seq_id_src, seq_id_dst, p0, p1)) {
-        return true;
-    }
-
-    const bool removed_recr = mem_recr->seq_rm(seq_id_dst, -1, -1);
-    const bool removed_attn = mem_attn->seq_rm_transient(seq_id_dst, -1, -1);
-    GGML_ASSERT(removed_recr && removed_attn);
-    GGML_UNUSED(removed_recr);
-    GGML_UNUSED(removed_attn);
-    return false;
+    mem_attn->seq_cp(seq_id_src, seq_id_dst, p0, p1);
+    mem_recr->seq_cp(seq_id_src, seq_id_dst, p0, p1);
 }
 
 void llama_memory_hybrid::seq_keep(llama_seq_id seq_id) {
@@ -250,20 +189,6 @@ std::map<ggml_backend_buffer_type_t, size_t> llama_memory_hybrid::memory_breakdo
     return mb;
 }
 
-std::map<ggml_backend_buffer_type_t, size_t> llama_memory_hybrid::memory_breakdown_vbr_managed() const {
-    // Recurrent state is fixed and n_seq_max-sized. Only the attention child follows the KV
-    // representation policy.
-    return mem_attn->memory_breakdown_vbr_managed();
-}
-
-std::map<ggml_backend_buffer_type_t, size_t> llama_memory_hybrid::memory_breakdown_fixed() const {
-    std::map<ggml_backend_buffer_type_t, size_t> mb = mem_attn->memory_breakdown_fixed();
-    for (const auto & buft_size : mem_recr->memory_breakdown_fixed()) {
-        mb[buft_size.first] += buft_size.second;
-    }
-    return mb;
-}
-
 void llama_memory_hybrid::state_write(llama_io_write_i & io, llama_seq_id seq_id, llama_state_seq_flags flags) const {
     if ((flags & LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY) == 0) {
         mem_attn->state_write(io, seq_id, flags);
@@ -272,31 +197,10 @@ void llama_memory_hybrid::state_write(llama_io_write_i & io, llama_seq_id seq_id
 }
 
 void llama_memory_hybrid::state_read(llama_io_read_i & io, llama_seq_id seq_id, llama_state_seq_flags flags) {
-    const bool read_attn = (flags & LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY) == 0;
-
-    if (read_attn) {
+    if ((flags & LLAMA_STATE_SEQ_FLAGS_PARTIAL_ONLY) == 0) {
         mem_attn->state_read(io, seq_id, flags);
     }
-
-    try {
-        mem_recr->state_read(io, seq_id, flags);
-    } catch (...) {
-        io.discard();
-        // the attention part is already restored - undo it
-        if (read_attn) {
-            mem_attn->state_clear(seq_id);
-        }
-
-        throw;
-    }
-}
-
-void llama_memory_hybrid::state_write_range(llama_io_write_i & io, llama_seq_id seq_id, llama_pos p0, llama_pos p1) const {
-    mem_attn->state_write_range(io, seq_id, p0, p1);
-}
-
-void llama_memory_hybrid::state_append_range(llama_io_read_i & io, llama_seq_id seq_id, llama_pos p0, llama_pos p1, llama_pos p_limit) {
-    mem_attn->state_append_range(io, seq_id, p0, p1, p_limit);
+    mem_recr->state_read(io, seq_id, flags);
 }
 
 llama_kv_cache * llama_memory_hybrid::get_mem_attn() const {
@@ -310,8 +214,8 @@ llama_memory_recurrent * llama_memory_hybrid::get_mem_recr() const {
 llama_memory_hybrid_context::llama_memory_hybrid_context(llama_memory_status status) : status(status) {}
 
 llama_memory_hybrid_context::llama_memory_hybrid_context(llama_memory_hybrid * mem) :
+    ctx_attn(mem->get_mem_attn()->init_full()),
     ctx_recr(mem->get_mem_recr()->init_full()),
-    ctx_attn(new llama_kv_cache_context(mem->get_mem_attn(), ctx_recr->get_max_graph_seqs())),
     status(llama_memory_status_combine(ctx_attn->get_status(), ctx_recr->get_status())) {
 }
 
@@ -319,8 +223,8 @@ llama_memory_hybrid_context::llama_memory_hybrid_context(
         llama_memory_hybrid * mem,
               llama_context * lctx,
                        bool   optimize) :
-    ctx_recr(mem->get_mem_recr()->init_update(lctx, optimize)),
     ctx_attn(mem->get_mem_attn()->init_update(lctx, optimize)),
+    ctx_recr(mem->get_mem_recr()->init_update(lctx, optimize)),
     status(llama_memory_status_combine(ctx_attn->get_status(), ctx_recr->get_status())) {
 }
 
@@ -330,8 +234,8 @@ llama_memory_hybrid_context::llama_memory_hybrid_context(
         std::vector<llama_ubatch>   ubatches) :
     ubatches(std::move(ubatches)),
     // note: here we copy the ubatches. not sure if this is ideal
-    ctx_recr(new llama_memory_recurrent_context(mem->get_mem_recr(), this->ubatches)),
     ctx_attn(new llama_kv_cache_context(mem->get_mem_attn(), std::move(sinfos_attn), this->ubatches)),
+    ctx_recr(new llama_memory_recurrent_context(mem->get_mem_recr(), this->ubatches)),
     status(llama_memory_status_combine(ctx_attn->get_status(), ctx_recr->get_status())) {
 }
 
@@ -368,27 +272,8 @@ const llama_ubatch & llama_memory_hybrid_context::get_ubatch() const {
     return ubatches[i_next];
 }
 
-uint32_t llama_memory_hybrid_context::get_max_graph_seqs() const {
-    if (!ctx_attn || !ctx_recr) {
-        return 0;
-    }
-    return std::min(ctx_attn->get_max_graph_seqs(), ctx_recr->get_max_graph_seqs());
-}
-
-uint64_t llama_memory_hybrid_context::get_vbr_epoch() const {
-    return get_attn()->get_vbr_epoch();
-}
-
 const llama_kv_cache_context * llama_memory_hybrid_context::get_attn() const {
     return static_cast<const llama_kv_cache_context *>(ctx_attn.get());
-}
-
-ggml_tensor * llama_memory_hybrid_context::get_turbo_rot_forward() const {
-    return ctx_attn ? ctx_attn->get_turbo_rot_forward() : nullptr;
-}
-
-ggml_tensor * llama_memory_hybrid_context::get_turbo_rot_inverse() const {
-    return ctx_attn ? ctx_attn->get_turbo_rot_inverse() : nullptr;
 }
 
 const llama_memory_recurrent_context * llama_memory_hybrid_context::get_recr() const {
