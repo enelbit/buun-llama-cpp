@@ -2126,6 +2126,7 @@ struct llama_context_params common_context_params_to_llama(const common_params &
 
     cparams.type_k = params.cache_type_k;
     cparams.type_v = params.cache_type_v;
+    cparams.kv_stream_stage_mib = params.kv_stream_stage_mib;
     cparams.vbr_min_bits          = params.vbr_min_bits_value;
     cparams.vbr_min_bits_explicit = params.vbr_min_bits_explicit;
     cparams.vbr_vram_budget_bytes = params.vbr_vram_budget_bytes;

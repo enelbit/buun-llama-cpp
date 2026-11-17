@@ -374,6 +374,7 @@ struct common_params_speculative_draft {
 
     ggml_type cache_type_k = GGML_TYPE_F16; // KV cache data type for the K
     ggml_type cache_type_v = GGML_TYPE_F16; // KV cache data type for the V
+    uint32_t kv_stream_stage_mib = 0;        // block-streaming staging budget, 0 = disabled [EXPERIMENTAL]
     bool cache_type_k_explicit = false; // -ctkd was given (beats --spec-draft-cache-follow)
     bool cache_type_v_explicit = false; // -ctvd was given (beats --spec-draft-cache-follow)
     bool draft_cache_follow = false; // inherit the main model -ctk/-ctv when -ctkd/-ctvd are unset
@@ -774,6 +775,7 @@ struct common_params {
 
     ggml_type cache_type_k = GGML_TYPE_F16; // KV cache data type for the K
     ggml_type cache_type_v = GGML_TYPE_F16; // KV cache data type for the V
+    uint32_t kv_stream_stage_mib = 0;        // block-streaming staging budget, 0 = disabled [EXPERIMENTAL]
     bool cache_type_k_explicit = false;      // whether -ct/-ctk explicitly selected the K type
     bool cache_type_v_explicit = false;      // whether -ct/-ctv explicitly selected the V type
     std::string vbr_budget = "dynamic"; // VBR target budget: dynamic or a fixed tier/bit width
