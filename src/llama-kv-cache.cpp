@@ -950,7 +950,7 @@ llama_kv_cache::llama_kv_cache(
     const  layer_reuse_cb & reuse,
     const  layer_share_cb & share,
     const llama_memory_vbr_params & vbr,
-             size_t kv_stream_stage_bytes = 0,
+             size_t kv_stream_stage_bytes,
              const char *   name_tag) :
     model(model), hparams(hparams), vbr_params_(vbr), v_trans(v_trans),
     n_seq_max(n_seq_max), n_stream(unified ? 1 : n_seq_max), n_pad(n_pad), n_swa(n_swa), swa_type(swa_type),
@@ -2248,10 +2248,11 @@ llama_kv_cache::llama_kv_cache(
     const layer_filter_cb & filter,
     const  layer_reuse_cb & reuse,
     const  layer_share_cb & share,
+             size_t kv_stream_stage_bytes,
              const char *   name_tag) :
     llama_kv_cache(model, hparams, type_k, type_v, v_trans, offload, unified,
             kv_size, n_seq_max, n_pad, n_swa, swa_type, mem_other,
-            filter, reuse, share, llama_memory_vbr_params{}, name_tag) {
+            filter, reuse, share, llama_memory_vbr_params{}, kv_stream_stage_bytes, name_tag) {
 }
 
 llama_kv_cache::~llama_kv_cache() {
@@ -12623,7 +12624,6 @@ void llama_kv_cache::set_input_k_idxs(ggml_tensor * dst, const llama_ubatch * ub
         for (uint32_t i = 0; i < sinfo.size(); ++i) {
             data[s*sinfo.size() + i] = offs + sinfo.idxs[s][i];
         }
-    }
 }
 
 
@@ -12633,6 +12633,7 @@ void llama_kv_cache::set_input_k_idxs(ggml_tensor * dst, const llama_ubatch * ub
         GGML_ASSERT(kv_stream_runtime.mark_dirty_rows_fn(
             kv_stream_runtime.runtime, data, n_tokens));
     }
+}
 void llama_kv_cache::set_input_v_idxs(ggml_tensor * dst, const llama_ubatch * ubatch, const slot_info & sinfo) const {
     const uint32_t n_tokens = ubatch->n_tokens;
     GGML_ASSERT(n_tokens == (int64_t) sinfo.size()*sinfo.n_stream());
@@ -14156,15 +14157,11 @@ bool llama_kv_cache_context::apply() {
     kv->apply_ubatch(sinfos[i_cur], ubatches[i_cur]);
     n_kv = kv->get_n_kv(sinfos[i_cur], n_used_batch);
 
-    if (kv->get_turbo_innerq_scale_inv() != nullptr && turbo_innerq_needs_tensor_update()) {
-        ggml_tensor * t = kv->get_turbo_innerq_scale_inv();
-        if (t->buffer != nullptr) {
-            ggml_backend_tensor_set(t, g_innerq_scale_inv_host, 0, INNERQ_MAX_CHANNELS * sizeof(float));
-            turbo_innerq_mark_tensor_updated();
-            LLAMA_LOG_INFO("%s: InnerQ scale_inv tensor updated
-", __func__);
-        }
-    }
+    //     if (kv->get_turbo_innerq_scale_inv() != nullptr && turbo_innerq_needs_tensor_update()) {
+    //         ggml_tensor * t = kv->get_turbo_innerq_scale_inv();
+    //         if (t->buffer != nullptr) {
+    //         }
+    // }
 
     return true;
 }

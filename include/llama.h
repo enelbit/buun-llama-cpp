@@ -434,7 +434,7 @@ extern "C" {
 
         enum ggml_type type_k; // data type for K cache [EXPERIMENTAL]
         enum ggml_type type_v; // data type for V cache [EXPERIMENTAL]
-        uint32_t kv_stream_stage_mib = 0; // block-streaming staging budget, 0 = disabled
+        uint32_t kv_stream_stage_mib; // block-streaming staging budget, 0 = disabled
         enum llama_vbr_codec vbr_codec; // representation ladder used by dynamic VBR [EXPERIMENTAL]
         double vbr_min_bits;              // aggregate KV floor in effective bits/value, 0 = bottom-tier floor; not a per-codec ban
         uint64_t vbr_vram_budget_bytes;   // mapped-physical KV VRAM budget in bytes, 0 = floor-layout-cost fallback

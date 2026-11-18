@@ -51,7 +51,7 @@ llama_memory_hybrid::llama_memory_hybrid(
             : filter_attn,
         nullptr,
         nullptr,
-        kv_stream_stage_bytes
+        llama_memory_vbr_params{}, kv_stream_stage_bytes, ""
     )),
     mem_recr(new llama_memory_recurrent(
         model,

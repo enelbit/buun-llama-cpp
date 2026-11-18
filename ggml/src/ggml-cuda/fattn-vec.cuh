@@ -674,11 +674,13 @@ void ggml_cuda_flash_attn_ext_vec_partial_case(
     memcpy(&logit_softcap, (const float *) dst->op_params + 2, sizeof(float));
     if (logit_softcap == 0.0f) {
         ggml_cuda_flash_attn_ext_vec_partial_case_impl<
-            D, type_K, type_V, false>(ctx, dst, partial_dst, partial_meta, nparts);
+            D, D, type_K, type_V, false>(ctx, dst, partial_dst, partial_meta, nparts);
     } else {
         ggml_cuda_flash_attn_ext_vec_partial_case_impl<
-            D, type_K, type_V, true>(ctx, dst, partial_dst, partial_meta, nparts);
+            D, D, type_K, type_V, true>(ctx, dst, partial_dst, partial_meta, nparts);
     }
+}
+template<int D, int cols_per_block, ggml_type type_K, ggml_type type_V, bool use_logit_softcap>
 void ggml_cuda_flash_attn_ext_vec_case_impl(ggml_backend_cuda_context & ctx, ggml_tensor * dst) {
     const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
 

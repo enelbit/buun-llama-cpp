@@ -175,6 +175,7 @@ public:
         size_t kv_stream_stage_bytes,
                  const char *   name_tag);
 
+    bool kv_stream_adapt(uint32_t active_tokens, uint32_t query_tokens);
     ~llama_kv_cache(); // frees the VBR VMM pool (if any); = default otherwise
 
     //

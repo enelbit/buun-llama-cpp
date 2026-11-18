@@ -43,6 +43,11 @@ set(LLAMA_CORE_SOURCES
             llama-impl.cpp
             llama-io.cpp
             llama-kv-cache.cpp
+            llama-kv-stream-plan.cpp
+            llama-kv-stream-config.cpp
+            llama-kv-stream-softmax.cpp
+            llama-memory-hybrid.cpp
+            llama-memory-hybrid-idx.cpp
             llama-kv-cache-iswa.cpp
             llama-kv-cache-dsa.cpp
             llama-kv-cache-dsa-iswa.cpp
