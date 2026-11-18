@@ -12152,6 +12152,145 @@ uint32_t llama_kv_cache::get_n_seq_max() const {
 uint32_t llama_kv_cache::get_n_stream() const {
     return n_stream;
 }
+bool llama_kv_cache::kv_stream_adapt(uint32_t active_tokens, uint32_t query_tokens) {
+    auto & owner = kv_stream_runtime;
+    if (owner.runtime == nullptr || owner.feedback_fn == nullptr ||
+            owner.span_feedback_fn == nullptr || owner.reconfigure_fn == nullptr ||
+            owner.layer_count == 0) {
+        return false;
+    }
+
+    constexpr uint32_t MAX_DECODE_QUERY_TOKENS = 32;
+    constexpr double MAX_DECODE_INTERVAL_MS = 1000.0;
+    const int64_t now_us = ggml_time_us();
+    if (owner.previous_adapt_us != 0 &&
+            owner.previous_query_tokens <= MAX_DECODE_QUERY_TOKENS &&
+            query_tokens <= MAX_DECODE_QUERY_TOKENS) {
+        const double elapsed_ms = (now_us - owner.previous_adapt_us)/1000.0;
+        if (elapsed_ms > 0.0 && elapsed_ms <= MAX_DECODE_INTERVAL_MS) {
+            (void) owner.span_feedback_fn(owner.runtime, elapsed_ms);
+        }
+    }
+    owner.previous_adapt_us = now_us;
+    owner.previous_query_tokens = query_tokens;
+
+    uint64_t deadline_samples = 0;
+    uint64_t deadline_misses = 0;
+    double copy_busy_ratio = 0.0;
+    uint32_t peak_occupancy = 0;
+    uint32_t ring_slots = 0;
+    uint32_t resident_pages = 0;
+    uint32_t controlled_pages = 0;
+    if (!owner.feedback_fn(owner.runtime,
+            &deadline_samples, &deadline_misses, &copy_busy_ratio,
+            &peak_occupancy, &ring_slots, &resident_pages, &controlled_pages)) {
+        return false;
+    }
+
+    const auto delta = llama_kv_stream_feedback_delta_make(
+        { deadline_samples, deadline_misses },
+        { owner.previous_deadline_samples, owner.previous_deadline_misses });
+    owner.previous_deadline_samples = deadline_samples;
+    owner.previous_deadline_misses = deadline_misses;
+    if (getenv("LLAMA_KV_STREAM_TRACE") != nullptr) {
+        LLAMA_LOG_WARN("%s: active %u, resident %u, ring %u, samples %llu, misses %llu, copy busy %.1f%%, peak %u\n",
+            __func__, active_tokens, resident_pages, ring_slots,
+            (unsigned long long) delta.deadline_samples,
+            (unsigned long long) delta.deadline_misses,
+            100.0*copy_busy_ratio, peak_occupancy);
+    }
+
+    const uint32_t active_pages = (active_tokens + 255)/256;
+    // Prompt chunks use the uniform layout because it grows without
+    // repartitioning. Decode-like microbatches concentrate the same page
+    // budget into fewer split layers, bounded by the ring working set so copy
+    // and compute can still overlap. A zero target restores prefill.
+    const uint32_t decode_layout_pages =
+        query_tokens <= MAX_DECODE_QUERY_TOKENS && active_pages > resident_pages ?
+            active_pages : 0;
+    const bool entering_decode_layout =
+        decode_layout_pages != 0 && decode_layout_pages != owner.decode_layout_pages;
+
+    if (ring_slots != 0 && owner.minimum_ring_slots == 0) {
+        owner.minimum_ring_slots = ring_slots;
+    }
+    if (!delta.valid) {
+        owner.starved_evaluations = 0;
+        owner.overprovisioned_evaluations = 0;
+        LLAMA_LOG_WARN("%s: ignoring invalid CUDA feedback: %s\n",
+            __func__, delta.error.c_str());
+    }
+
+    uint32_t target_ring_slots = ring_slots;
+    uint32_t target_resident_pages = resident_pages;
+    bool partition_changed = false;
+    const bool fixed_ring =
+        getenv("GGML_CUDA_KV_STREAM_FIXED_RING_SLOTS") != nullptr;
+
+    // No streaming pressure exists while every active page fits in the
+    // resident partition; preserve the current boundary without churn.
+    if (active_pages <= resident_pages) {
+        owner.starved_evaluations = 0;
+        owner.overprovisioned_evaluations = 0;
+    } else if (ring_slots != 0 && !fixed_ring &&
+            (entering_decode_layout || (delta.valid && delta.has_evaluation))) {
+        if (delta.has_evaluation && owner.evaluations_since_repartition != UINT32_MAX) {
+            ++owner.evaluations_since_repartition;
+        }
+
+        llama_kv_stream_partition_params params;
+        params.total_pool_pages = controlled_pages;
+        params.layer_count = owner.layer_count;
+        params.active_pages_per_layer = active_pages;
+        params.minimum_ring_slots = owner.minimum_ring_slots;
+        params.previous_resident_pages_per_layer = resident_pages;
+        params.previous_ring_slots = ring_slots;
+        params.deadline_miss_ratio = delta.valid ? delta.deadline_miss_ratio : 0.0;
+        params.copy_engine_busy_ratio = copy_busy_ratio;
+        params.ring_peak_occupancy_ratio =
+            std::min(1.0, double(peak_occupancy)/double(ring_slots));
+        params.starved_evaluations = owner.starved_evaluations;
+        params.overprovisioned_evaluations = owner.overprovisioned_evaluations;
+        params.evaluations_since_repartition = owner.evaluations_since_repartition;
+        params.entering_decode_layout = entering_decode_layout;
+
+        const auto partition = llama_kv_stream_partition_adapt(params);
+        if (!partition.valid) {
+            LLAMA_LOG_WARN("%s: ignoring invalid partition feedback: %s\n",
+                __func__, partition.error.c_str());
+        } else {
+            owner.starved_evaluations = partition.starved_evaluations;
+            owner.overprovisioned_evaluations = partition.overprovisioned_evaluations;
+            partition_changed = partition.changed;
+            target_ring_slots = partition.ring_slots;
+            target_resident_pages = partition.resident_pages_per_layer;
+        }
+    }
+
+    const bool layout_changed = decode_layout_pages != owner.decode_layout_pages;
+    if ((layout_changed || partition_changed) && ring_slots != 0) {
+        if (!owner.reconfigure_fn(
+                owner.runtime, decode_layout_pages, target_ring_slots)) {
+            LLAMA_LOG_WARN(
+                "%s: failed to publish CUDA KV decode layout %u with ring %u\n",
+                __func__, decode_layout_pages, target_ring_slots);
+            return false;
+        }
+        owner.decode_layout_pages = decode_layout_pages;
+    }
+
+    if (!partition_changed) {
+        return false;
+    }
+    owner.evaluations_since_repartition = 0;
+    LLAMA_LOG_WARN("%s: adaptive KV partition: resident pages/layer %u -> %u, ring slots %u -> %u, miss %.1f%%, copy busy %.1f%%\n",
+        __func__, resident_pages, target_resident_pages,
+        ring_slots, target_ring_slots,
+        100.0*(delta.valid ? delta.deadline_miss_ratio : 0.0),
+        100.0*copy_busy_ratio);
+    return true;
+}
+
 
 uint32_t llama_kv_cache::get_stream_for_seq(llama_seq_id seq_id) const {
     GGML_ASSERT(seq_id >= 0 && size_t(seq_id) < seq_to_stream.size());
