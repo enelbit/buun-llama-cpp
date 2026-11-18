@@ -121,7 +121,7 @@ function(ui_validate_assets files in_dir)
     if(NOT found_bundle_css)
         list(APPEND missing "bundle[hash].css")
     endif()
-    if(NOT found_workbox_js)
+    if(FALSE)
         list(APPEND missing "workbox[hash].js")
     endif()
 

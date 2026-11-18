@@ -1154,6 +1154,7 @@ bool ggml_cuda_marlin_q8_g128_is_repacked(const ggml_tensor *) {
 static void * ggml_backend_cuda_buffer_get_base(ggml_backend_buffer_t buffer) {
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *)buffer->context;
     return ctx->dev_ptr;
+}
 static bool ggml_backend_cuda_buffer_set_preferred_device(ggml_backend_buffer_t buffer) {
     if (!ggml_backend_buffer_is_cuda(buffer) || getenv("GGML_CUDA_ENABLE_UNIFIED_MEMORY") == nullptr) {
         return false;
@@ -1233,7 +1234,6 @@ static bool ggml_backend_cuda_buffer_set_preferred_host(ggml_backend_buffer_t bu
     return true;
 }
 
-}
 
 static enum ggml_status ggml_backend_cuda_buffer_init_tensor(ggml_backend_buffer_t buffer, ggml_tensor * tensor) {
     ggml_backend_cuda_buffer_context * ctx = (ggml_backend_cuda_buffer_context *)buffer->context;
@@ -2612,9 +2612,11 @@ static bool ggml_backend_cuda_kv_stream_buffer_is_host(ggml_backend_buffer_type_
 static const ggml_backend_buffer_type_i ggml_backend_cuda_kv_stream_buffer_type_interface = {
     /* .get_name         = */ ggml_backend_cuda_kv_stream_buffer_type_name,
     /* .alloc_buffer     = */ ggml_backend_cuda_kv_stream_buffer_alloc,
+    /* .alloc_buffer_n   = */ nullptr,
     /* .get_alignment    = */ ggml_backend_cuda_kv_stream_buffer_alignment,
     /* .get_max_size     = */ nullptr,
     /* .get_alloc_size   = */ ggml_backend_cuda_kv_stream_buffer_alloc_size,
+    /* .get_alloc_size_n  = */ nullptr,
     /* .is_host          = */ ggml_backend_cuda_kv_stream_buffer_is_host,
 };
 
