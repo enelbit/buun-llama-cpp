@@ -1,4 +1,5 @@
 #include "llama-kv-cache.h"
+#include "llama-kv-stream-plan.h"
 #include "llama-kv-cache-mask.h"
 #include "llama-vbr-codec.h"
 
@@ -949,6 +950,7 @@ llama_kv_cache::llama_kv_cache(
     const  layer_reuse_cb & reuse,
     const  layer_share_cb & share,
     const llama_memory_vbr_params & vbr,
+             size_t kv_stream_stage_bytes = 0,
              const char *   name_tag) :
     model(model), hparams(hparams), vbr_params_(vbr), v_trans(v_trans),
     n_seq_max(n_seq_max), n_stream(unified ? 1 : n_seq_max), n_pad(n_pad), n_swa(n_swa), swa_type(swa_type),
@@ -1024,7 +1026,7 @@ llama_kv_cache::llama_kv_cache(
         if (it == ctx_map.end()) {
             const size_t n_turbo_extra = needs_turbo_layout ? 8 : 0; // rotation matrices + safety margin
             ggml_init_params params = {
-                /*.mem_size   =*/ size_t((2u*(1 + n_stream)*n_layer + n_turbo_extra)*ggml_tensor_overhead()),
+                /*.mem_size   =*/ size_t((3u*(1 + n_stream)*n_layer + n_turbo_extra + 4)*ggml_tensor_overhead()),
                 /*.mem_buffer =*/ NULL,
                 /*.no_alloc   =*/ true,
             };
