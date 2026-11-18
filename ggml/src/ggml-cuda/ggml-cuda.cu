@@ -11564,6 +11564,7 @@ static ggml_backend_buffer_type_t ggml_backend_cuda_device_get_host_buffer_type(
 // TODO: move these functions here
 static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const ggml_tensor * op) {
     ggml_backend_cuda_device_context * dev_ctx = (ggml_backend_cuda_device_context *) dev->context;
+    bool uses_streamed_kv = false;
 
     // check if all the sources are allocated on this device
     for (int i = 0; i < GGML_MAX_SRC; i++) {
@@ -11573,6 +11574,17 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
                 return false;
             }
         }
+        if (op->src[i] && op->src[i]->buffer &&
+            ggml_backend_buft_is_cuda_kv_stream(op->src[i]->buffer->buft)) {
+            if (op->src[i]->buffer->buft->device != dev) {
+                return false;
+            }
+            uses_streamed_kv = true;
+        }
+    }
+
+    if (uses_streamed_kv && op->op != GGML_OP_SET_ROWS && op->op != GGML_OP_FLASH_ATTN_EXT) {
+        return false;
     }
 
     switch (op->op) {
@@ -12232,6 +12244,9 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
                 op->type == GGML_TYPE_F32 && ggml_is_contiguous(op->src[0]) &&
                 ggml_is_contiguous(op->src[1]) && ggml_is_contiguous(op->src[2]);
         case GGML_OP_FLASH_ATTN_EXT:
+            if (uses_streamed_kv) {
+                return ggml_cuda_kv_stream_fattn_fits(op);
+            }
             return ggml_cuda_flash_attn_ext_supported(dev_ctx->device, op);
         case GGML_OP_CROSS_ENTROPY_LOSS:
         case GGML_OP_CROSS_ENTROPY_LOSS_BACK:
@@ -12255,7 +12270,9 @@ static bool ggml_backend_cuda_device_supports_op(ggml_backend_dev_t dev, const g
 static bool ggml_backend_cuda_device_supports_buft(ggml_backend_dev_t dev, ggml_backend_buffer_type_t buft) {
     ggml_backend_cuda_device_context * dev_ctx = (ggml_backend_cuda_device_context *) dev->context;
     const bool integrated = ggml_cuda_info().devices[dev_ctx->device].integrated;
-    return (ggml_backend_buft_is_cuda(buft) && buft->device == dev) || (integrated && ggml_backend_buft_is_cuda_host(buft));
+    return (ggml_backend_buft_is_cuda(buft) && buft->device == dev) ||
+           (ggml_backend_buft_is_cuda_kv_stream(buft) && buft->device == dev) ||
+           (integrated && ggml_backend_buft_is_cuda_host(buft));
 }
 
 static int64_t get_op_batch_size(const ggml_tensor * op) {
