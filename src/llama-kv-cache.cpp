@@ -1665,6 +1665,19 @@ llama_kv_cache::llama_kv_cache(
 
         if (!is_vmm_buf) {
             ggml_backend_buffer_clear(buf, 0); // VMM pages are zeroed at map time instead
+
+        if (kv_stream_stage_bytes == 0 && getenv("GGML_CUDA_PREFER_KV_HOST") != nullptr && ggml_backend_buffer_get_size(buf) > 0) {
+            ggml_backend_dev_t dev_kv = ggml_backend_buft_get_device(buft);
+            if (dev_kv != nullptr) {
+                ggml_backend_reg_t reg_kv = ggml_backend_dev_backend_reg(dev_kv);
+                using prefer_host_fn_t = bool (*)(ggml_backend_buffer_t);
+                auto * prefer_host_fn = (prefer_host_fn_t) ggml_backend_reg_get_proc_address(
+                    reg_kv, "ggml_backend_cuda_buffer_set_preferred_host");
+                if (prefer_host_fn != nullptr) {
+                    (void) prefer_host_fn(buf);
+                }
+            }
+        }
         }
 
         // Fill turbo rotation matrices AFTER buffer clear (clear zeroes everything)
