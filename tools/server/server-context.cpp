@@ -9819,7 +9819,7 @@ private:
 
         // Always enable kv_unified for single-slot servers — simplifies CUDA graph topology,
         // giving ~28% faster prompt eval even without speculative decoding.
-        if (n_parallel_user == 1 && !params_base.kv_unified) {
+        if (n_parallel_user == 1 && !params_base.kv_unified && params_base.kv_stream_stage_mib == 0) {
             params_base.kv_unified = true;
             SRV_INF("%s", "auto-enabled kv-unified: single-slot server doesn't need separate KV stream\n");
         }

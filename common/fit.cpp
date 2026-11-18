@@ -841,7 +841,7 @@ static void common_params_fit_impl(
         float * tensor_split, struct llama_model_tensor_buft_override * tensor_buft_overrides,
         common_moe_cache_params * moe_cache, size_t * margins_s, uint32_t n_ctx_min,
         const common_fit_extra_model * extra, enum ggml_log_level log_level,
-        ggml_type type_k_entry, ggml_type type_v_entry) {
+        const size_t * budgets, ggml_type type_k_entry, ggml_type type_v_entry) {
     // SPLIT_MODE_TENSOR runs through the single-device paths below: the model exposes exactly one
     // meta device whose memory report is the balanced-equivalent aggregate of the real GPUs (see
     // common_get_device_memory_data_impl) and whose margin is the sum of the per-device targets.
@@ -1882,6 +1882,9 @@ static void common_params_fit_impl(
     std::vector<int64_t> targets; // maximum acceptable memory use per device
     targets.reserve(nd);
     for (size_t id = 0; id < nd; id++) {
+        if (budgets && budgets[id] > 0) {
+            margins[id] = std::max(margins[id], (int64_t)dmds_full[id].free - (int64_t)budgets[id]);
+        }
         targets.push_back(dmds_full[id].free - margins[id]);
         LOG_TRC("%s: id=%zu, target=%" PRId64 " MiB\n", __func__, id, targets[id]/MiB);
     }
@@ -2834,6 +2837,7 @@ enum common_params_fit_status common_fit_params(
         uint32_t n_ctx_min,
         const common_fit_extra_model * extra,
         ggml_log_level log_level,
+        const size_t * budgets,
         uint32_t n_ubatch_max,
         bool split_mode_auto) {
     const int64_t t0_us = llama_time_us();
@@ -2947,6 +2951,7 @@ enum common_params_fit_status common_fit_params(
         try {
             common_params_fit_impl(path_model, mparams, cparams, tensor_split, tensor_buft_overrides,
                     moe_cache, margins_ub.data(), n_ctx_min, extra, log_level,
+                    budgets,
                     type_k_entry, type_v_entry);
             LOG_TRC("%s: successfully fit params to free device memory\n", __func__);
             return COMMON_PARAMS_FIT_STATUS_SUCCESS;

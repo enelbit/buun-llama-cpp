@@ -1530,6 +1530,7 @@ common_init_result::common_init_result(common_params & params, bool model_only) 
             params.fit_params_min_ctx,
             has_draft || spec_mtp ? &extra_dft : nullptr,
             params.verbosity >= LOG_LEVEL_DEBUG ? GGML_LOG_LEVEL_DEBUG : GGML_LOG_LEVEL_ERROR,
+            params.fit_params_budget.data(),
             !params.n_ubatch_auto ? 0 : params.n_batch_explicit ? params.n_batch : UINT32_MAX,
             !params.split_mode_explicit && params.lora_adapters.empty());
         if (fit_status != COMMON_PARAMS_FIT_STATUS_SUCCESS) {

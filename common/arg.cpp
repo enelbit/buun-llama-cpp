@@ -4101,6 +4101,26 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_FIT_TARGET"));
     add_opt(common_arg(
+        { "--fit-budget" }, "MiB0,MiB1,MiB2,...",
+        "absolute VRAM ceiling per device in MiB for --fit (0 = disabled, single value broadcast to all devices)",
+        [](common_params & params, const std::string & value) {
+            const std::vector<std::string> split_arg = string_split<std::string>(value, ',');
+            if (split_arg.size() > llama_max_devices()) {
+                throw std::invalid_argument(string_format("got %zu budgets but only %zu devices are supported", split_arg.size(), llama_max_devices()));
+            }
+            const auto mib = [](const std::string & v) -> size_t {
+                if (v.empty() || v[0] == '-') {
+                    throw std::invalid_argument("--fit-budget takes non-negative MiB values");
+                }
+                return std::stoull(v) * 1024*1024;
+            };
+            params.fit_params_budget.assign(llama_max_devices(), mib(split_arg[0]));
+            for (size_t i = 1; i < split_arg.size(); i++) {
+                params.fit_params_budget[i] = mib(split_arg[i]);
+            }
+        }
+    ).set_examples({LLAMA_EXAMPLE_SERVER, LLAMA_EXAMPLE_FIT_PARAMS}));
+    add_opt(common_arg(
         { "-fitc", "--fit-ctx" }, "N",
         string_format("minimum ctx size that can be set by --fit option, default: %" PRIu32, params.fit_params_min_ctx),
         [](common_params & params, int value) {

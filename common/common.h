@@ -654,6 +654,7 @@ struct common_params {
 
     // margin per device in bytes for fitting parameters to free memory:
     std::vector<size_t> fit_params_target = std::vector<size_t>(llama_max_devices(), 1024 * 1024*1024);
+    std::vector<size_t> fit_params_budget = std::vector<size_t>(llama_max_devices(), 0); // absolute VRAM ceiling per device in bytes, 0 = disabled
     // Server-side auxiliary reservations may raise fit_params_target. Dynamic VBR should retain
     // the caller's ordinary per-device safety headroom and account auxiliaries through live free
     // memory instead of treating their bytes as permanently unavailable a second time.
