@@ -12476,7 +12476,15 @@ ggml_tensor * llama_kv_cache::cpy_k(ggml_context * ctx, ggml_tensor * k_cur, ggm
     }
 
     // store the current K values into the cache
-    return ggml_set_rows(ctx, k, k_cur, k_idxs);
+    ggml_tensor * result = ggml_set_rows(ctx, k, k_cur, k_idxs);
+
+    const bool k_is_turbo = (k->type == GGML_TYPE_TURBO3_0 || k->type == GGML_TYPE_TURBO4_0 || k->type == GGML_TYPE_TURBO2_0);
+    if (k_is_turbo) {
+        int32_t wht_group = 128;
+        memcpy(result->op_params, &wht_group, sizeof(int32_t));
+    }
+
+    return result;
 }
 
 
@@ -12518,7 +12526,13 @@ ggml_tensor * llama_kv_cache::cpy_v(ggml_context * ctx, ggml_tensor * v_cur, ggm
             // merge the buffer across all streams because the idxs are global
             v = ggml_reshape_2d(ctx, v, n_embd_gqa_cache, kv_size*n_stream);
         }
-
+        ggml_tensor * result = ggml_set_rows(ctx, v, v_cur, v_idxs);
+        const bool v_is_turbo = (v->type == GGML_TYPE_TURBO3_0 || v->type == GGML_TYPE_TURBO4_0 || v->type == GGML_TYPE_TURBO2_0);
+        if (v_is_turbo) {
+            int32_t wht_group = 128;
+            memcpy(result->op_params, &wht_group, sizeof(int32_t));
+        }
+        return result;
         return ggml_set_rows(ctx, v, v_cur, v_idxs);
     }
 
@@ -12613,6 +12627,12 @@ void llama_kv_cache::set_input_k_idxs(ggml_tensor * dst, const llama_ubatch * ub
 }
 
 
+
+    if (kv_stream_runtime.runtime != nullptr) {
+        GGML_ASSERT(kv_stream_runtime.mark_dirty_rows_fn != nullptr);
+        GGML_ASSERT(kv_stream_runtime.mark_dirty_rows_fn(
+            kv_stream_runtime.runtime, data, n_tokens));
+    }
 void llama_kv_cache::set_input_v_idxs(ggml_tensor * dst, const llama_ubatch * ubatch, const slot_info & sinfo) const {
     const uint32_t n_tokens = ubatch->n_tokens;
     GGML_ASSERT(n_tokens == (int64_t) sinfo.size()*sinfo.n_stream());
@@ -14135,6 +14155,16 @@ bool llama_kv_cache_context::apply() {
 
     kv->apply_ubatch(sinfos[i_cur], ubatches[i_cur]);
     n_kv = kv->get_n_kv(sinfos[i_cur], n_used_batch);
+
+    if (kv->get_turbo_innerq_scale_inv() != nullptr && turbo_innerq_needs_tensor_update()) {
+        ggml_tensor * t = kv->get_turbo_innerq_scale_inv();
+        if (t->buffer != nullptr) {
+            ggml_backend_tensor_set(t, g_innerq_scale_inv_host, 0, INNERQ_MAX_CHANNELS * sizeof(float));
+            turbo_innerq_mark_tensor_updated();
+            LLAMA_LOG_INFO("%s: InnerQ scale_inv tensor updated
+", __func__);
+        }
+    }
 
     return true;
 }
