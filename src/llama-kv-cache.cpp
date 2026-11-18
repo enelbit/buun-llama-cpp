@@ -1072,6 +1072,17 @@ llama_kv_cache::llama_kv_cache(
     }
 
     const bool is_mla = hparams.is_mla();
+
+    ggml_backend_dev_t kv_stream_dev = nullptr;
+    ggml_backend_buffer_type_t kv_stream_buft = nullptr;
+    uint32_t kv_stream_layer_count = 0;
+    if (kv_stream_stage_bytes != 0) {
+        for (uint32_t il = 0; il < n_layer; ++il) {
+            if (hparams.has_kv(il) && (!filter || filter(il))) {
+                ++kv_stream_layer_count;
+            }
+        }
+    }
     // Kept parallel to layers[] so scratch registration can select only tensors actually
     // aliased from mem_other. Local f16 tensors must remain zero-cost.
     std::vector<bool> layer_is_shared;
