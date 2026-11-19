@@ -3344,6 +3344,22 @@ common_params_context common_params_parser_init(common_params & params, llama_ex
         }
     ).set_env("LLAMA_ARG_KV_STREAM_STAGE_MIB"));
     add_opt(common_arg(
+        {"--kv-stream-min-mib"}, "N",
+        string_format("minimum KV streaming pool in MiB (0 = no floor) (default: %u)", params.kv_stream_min_mib),
+        [](common_params & params, int value) {
+            if (value < 0) throw std::invalid_argument("min must be non-negative");
+            params.kv_stream_min_mib = value;
+        }
+    ).set_env("LLAMA_ARG_KV_STREAM_MIN_MIB"));
+    add_opt(common_arg(
+        {"--kv-stream-max-mib"}, "N",
+        string_format("maximum KV streaming pool in MiB (0 = no ceiling) (default: %u)", params.kv_stream_max_mib),
+        [](common_params & params, int value) {
+            if (value < 0) throw std::invalid_argument("max must be non-negative");
+            params.kv_stream_max_mib = value;
+        }
+    ).set_env("LLAMA_ARG_KV_STREAM_MAX_MIB"));
+    add_opt(common_arg(
         {"--repack"},
         {"-nr", "--no-repack"},
         string_format("whether to enable weight repacking (default: %s)", params.no_extra_bufts ? "disabled" : "enabled"),

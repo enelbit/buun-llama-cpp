@@ -2127,7 +2127,17 @@ struct llama_context_params common_context_params_to_llama(const common_params &
 
     cparams.type_k = params.cache_type_k;
     cparams.type_v = params.cache_type_v;
-    cparams.kv_stream_stage_mib = params.kv_stream_stage_mib;
+    {
+        uint32_t stage = params.kv_stream_stage_mib;
+        if (stage > 0) {
+            if (params.kv_stream_min_mib > 0 && stage < params.kv_stream_min_mib) stage = params.kv_stream_min_mib;
+            if (params.kv_stream_max_mib > 0 && stage > params.kv_stream_max_mib) stage = params.kv_stream_max_mib;
+        }
+        if (stage != params.kv_stream_stage_mib) {
+            LOG_INF("kv-stream: pool clamped %u -> %u MiB (min=%u, max=%u)\n", params.kv_stream_stage_mib, stage, params.kv_stream_min_mib, params.kv_stream_max_mib);
+        }
+        cparams.kv_stream_stage_mib = stage;
+    }
     cparams.vbr_min_bits          = params.vbr_min_bits_value;
     cparams.vbr_min_bits_explicit = params.vbr_min_bits_explicit;
     cparams.vbr_vram_budget_bytes = params.vbr_vram_budget_bytes;
