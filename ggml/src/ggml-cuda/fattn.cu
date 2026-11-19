@@ -984,6 +984,7 @@ ggml_backend_cuda_kv_stream_get_type_capabilities(ggml_type type) {
         case GGML_TYPE_TURBO2_0:
         case GGML_TYPE_TURBO3_0:
         case GGML_TYPE_TURBO4_0:
+        case GGML_TYPE_TURBO8_0:
             result.classified = true;
             break;
         default:
@@ -1005,6 +1006,7 @@ ggml_backend_cuda_kv_stream_get_type_capabilities(ggml_type type) {
         case GGML_TYPE_TURBO2_0:
         case GGML_TYPE_TURBO3_0:
         case GGML_TYPE_TURBO4_0:
+        case GGML_TYPE_TURBO8_0:
             result.online_write = true;
             break;
         default:
@@ -1038,6 +1040,7 @@ ggml_backend_cuda_kv_stream_get_type_capabilities(ggml_type type) {
         case GGML_TYPE_IQ1_M:
         case GGML_TYPE_MXFP4:
         case GGML_TYPE_NVFP4:
+        case GGML_TYPE_TURBO8_0:
             result.decode_f16 = true;
             break;
         default:

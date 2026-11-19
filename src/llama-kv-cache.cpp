@@ -1767,7 +1767,7 @@ llama_kv_cache::llama_kv_cache(
     // Record per-(layer,side) dynamic-VBR descriptors over the just-placed KV tensors.
     // Pure bookkeeping: allocation behavior above is unchanged. The runtime controller uses
     // these to transcode a tensor down a tier in place and return the freed bytes to the pool.
-    if ((vbr_layer_policy.enabled || needs_turbo_layout || vbr_params_.dynamic) && !hparams.no_alloc) {
+    if (vbr_dynamic_wanted && (vbr_layer_policy.enabled || needs_turbo_layout || vbr_params_.dynamic) && !hparams.no_alloc) {
         // Per-pool tensor instances: a tensor placed in a plain device buffer is its own (single)
         // instance; a tensor behind the meta buffer (-sm tensor) has one shard instance per simple
         // device. Instances with no bytes (zero-width shard) are skipped.
