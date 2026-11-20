@@ -1012,7 +1012,8 @@ bool llama_safetensors_qwen4exp_importer::describe(
             // exl3_ngram_trellis rows: [rows, 1 + 10K] int16 per shard
             uint64_t words = 0;
             for (uint32_t i = 0; i < ple_shards_; ++i) {
-                const auto & shard = require_tensor(registry_, prefix + std::to_string(i) + ".trellis");
+                const std::string shard_name = prefix + std::to_string(i) + ".trellis";
+                const auto & shard = require_tensor(registry_, shard_name);
                 if (shard.shape.size() != 2 || shard.dtype != llama_safetensors_dtype::I16 ||
                     (i != 0 && shard.shape[1] != words)) {
                     throw std::runtime_error("invalid Qwen4 EXL3 n-gram shard contract");
@@ -1210,7 +1211,8 @@ bool llama_safetensors_qwen4exp_importer::load(
         if (ggml_type_is_exl3_ngram(destination->type)) {
             size_t offset = 0;
             for (uint32_t i = 0; i < ple_shards_; ++i) {
-                const auto & desc = require_tensor(registry_, prefix + std::to_string(i) + ".trellis");
+                const std::string desc_name = prefix + std::to_string(i) + ".trellis";
+                const auto & desc = require_tensor(registry_, desc_name);
                 const uint8_t * data = registry_.data(desc);
                 std::vector<uint8_t> owned;
                 if (data == nullptr) { owned = registry_.read(desc); data = owned.data(); }

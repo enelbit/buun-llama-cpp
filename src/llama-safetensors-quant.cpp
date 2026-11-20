@@ -640,7 +640,8 @@ std::optional<llama_safetensors_quant_binding> llama_safetensors_quant_adapters:
     }
 
     if (group->format == llama_safetensors_quant_format::EXL3) {
-        const auto & trellis = require_tensor(registry_, module + ".trellis");
+    const std::string trellis_name = module + ".trellis";
+    const auto & trellis = require_tensor(registry_, trellis_name);
         if (trellis.shape.size() != 3 || trellis.dtype != llama_safetensors_dtype::I16 ||
                 trellis.shape[2] % 16 != 0 || trellis.shape[2] / 16 < 1 || trellis.shape[2] / 16 > 8 ||
                 (trellis.shape[0] * 16) % 128 != 0 || (trellis.shape[1] * 16) % 128 != 0) {

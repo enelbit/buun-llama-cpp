@@ -4482,9 +4482,10 @@ void llama_model_share_tensors(llama_model * dst, const llama_model * src) {
         if (!a.share || !a.src) {
             continue;
         }
-        for (const auto & maps : {
+    const auto maps_list = {
                 std::make_pair(&src->hadamard_rotations, &dst->hadamard_rotations),
-                std::make_pair(&src->hadamard_inverses,  &dst->hadamard_inverses) }) {
+                std::make_pair(&src->hadamard_inverses,  &dst->hadamard_inverses) };
+    for (const auto & maps : maps_list) {
             const auto it = maps.first->find(a.src);
             if (it != maps.first->end()) {
                 transforms.push_back({ a.dst, maps.second, it->second });

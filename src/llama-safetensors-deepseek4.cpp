@@ -767,8 +767,10 @@ std::vector<uint8_t> llama_safetensors_deepseek4_importer::materialize(
                 result.insert(result.end(), hb.begin(), hb.end());
             }
         } else if (spec.kind == target_kind::ENGRAM_GATE) {
-            const auto & q = require_tensor(registry_, spec.source + "q_weight");
-            const auto & k = require_tensor(registry_, spec.source + "k_weight");
+            const std::string q_name = spec.source + "q_weight";
+            const std::string k_name = spec.source + "k_weight";
+            const auto & k = require_tensor(registry_, k_name);
+            const auto & q = require_tensor(registry_, q_name);
             // base checkpoints ship BF16; EXL3 conversions keep them F32
             const auto read_f32 = [&](const llama_safetensors_tensor & t) {
                 switch (t.dtype) {

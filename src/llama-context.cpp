@@ -2302,7 +2302,7 @@ void llama_context::set_dflash_topk(int k) {
 }
 
 void llama_context::set_dflash_block_size(int n) {
-    GGML_ASSERT(n == 0 || (n >= 3 && n <= model.hparams.dflash_block_size));
+    GGML_ASSERT(n == 0 || (n >= 3 && n <= (int)model.hparams.dflash_block_size));
     if (cparams.dflash_block_size != n) {
         cparams.dflash_block_size = n;
         invalidate_graph_results();
@@ -5230,7 +5230,7 @@ int llama_context::decode(const llama_batch & batch_inp, const llama_batch_ext *
             // needs to happen before the graph is built
             n_outputs = n_outputs_new;
 
-            if (!cparams.logits_all && !warned_logits_all && n_outputs > (int32_t)cparams.n_seq_max) {
+            if (!cparams.logits_all && !warned_logits_all && n_outputs > cparams.n_seq_max) {
                 warned_logits_all = true;
                 LLAMA_LOG_WARN("%s: --no-logits-all is set but batch requested %d outputs (> n_seq_max = %d); "
                                "consider removing --no-logits-all for this workload\n",

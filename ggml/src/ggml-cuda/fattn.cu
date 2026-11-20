@@ -741,7 +741,6 @@ static bool kv_stream_page_mutable(
 
 namespace {
 
-constexpr int KV_STREAM_HEAD_DIM = 256;
 constexpr int KV_STREAM_MAX_PARTS_PER_CHUNK = 16;
 constexpr int KV_STREAM_QUERY_WORKSPACE_TOKENS = 256;
 
@@ -2285,13 +2284,16 @@ bool ggml_cuda_flash_attn_ext_ordered(ggml_backend_cuda_context & ctx, ggml_tens
     // Metadata-only views of the original pools. The selected width is logical;
     // ordered IDs map every load to a physical row, including the mask load.
     ggml_tensor k = *dst->src[1], v = *dst->src[2], mask = *dst->src[3], out = *dst;
-    for (auto pair : {std::make_pair(&k, keys), std::make_pair(&v, values)}) {
-        pair.first->data = pair.second->data;
-        pair.first->nb[0] = sizeof(half);
-        pair.first->nb[1] = pair.second->nb[1];
-        pair.first->nb[2] = 256*sizeof(half);
-        pair.first->nb[3] = 0;
-    }
+    k.data = keys->data;
+    k.nb[0] = sizeof(half);
+    k.nb[1] = keys->nb[1];
+    k.nb[2] = 256*sizeof(half);
+    k.nb[3] = 0;
+    v.data = values->data;
+    v.nb[0] = sizeof(half);
+    v.nb[1] = values->nb[1];
+    v.nb[2] = 256*sizeof(half);
+    v.nb[3] = 0;
     mask.data = mask_cells->data;
     mask.ne[0] = mask_cells->ne[1];
     mask.nb[0] = sizeof(half);

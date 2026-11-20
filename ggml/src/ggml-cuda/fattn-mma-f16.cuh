@@ -3011,4 +3011,5 @@ void ggml_cuda_flash_attn_ext_mma_f16_partial_case(
         ggml_backend_cuda_context & ctx, ggml_tensor * dst,
         float * partial_dst, float2 * partial_meta) {
     GGML_ABORT("mma_f16_partial_case: not supported on this architecture");
+    (void)ctx; (void)dst; (void)partial_dst; (void)partial_meta;
 }

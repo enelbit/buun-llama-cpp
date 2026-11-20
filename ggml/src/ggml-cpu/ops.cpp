@@ -6247,6 +6247,8 @@ void ggml_compute_forward_clamp(
             {
                 // no-op
             }
+        default:
+            break;
     }
 }
 
