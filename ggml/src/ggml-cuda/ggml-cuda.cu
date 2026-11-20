@@ -4743,7 +4743,12 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
             ggml_cuda_op_argsort(ctx, dst);
             break;
         case GGML_OP_FLASH_ATTN_EXT:
-            ggml_cuda_flash_attn_ext(ctx, dst);
+            if (ggml_cuda_kv_stream_runtime_from_tensor(dst->src[1]) != nullptr ||
+                    ggml_cuda_kv_stream_runtime_from_tensor(dst->src[2]) != nullptr) {
+                ggml_cuda_kv_stream_fattn(ctx, dst);
+            } else {
+                ggml_cuda_flash_attn_ext(ctx, dst);
+            }
             break;
         case GGML_OP_CROSS_ENTROPY_LOSS:
             ggml_cuda_cross_entropy_loss(ctx, dst);
@@ -11032,6 +11037,11 @@ static void ggml_backend_cuda_graph_optimize(ggml_backend_t backend, ggml_cgraph
         }
         return false;
     };
+
+    // The graph order is now final. Build one shared deadline queue
+    // per KV runtime before issuing any attention work.
+    const auto kv_stream_runtimes = ggml_cuda_kv_stream_prepare_graph(
+        cgraph, cuda_ctx->stream());
 
     for (int node_idx = 0; node_idx < cgraph->n_nodes; node_idx++) {
         const ggml_tensor * node = cgraph->nodes[node_idx];
