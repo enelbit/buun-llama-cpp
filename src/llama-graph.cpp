@@ -3393,6 +3393,22 @@ ggml_tensor * llm_graph_context::build_attn_mha(
         ggml_prec_set_acc (cur, GGML_PREC_F32);
         ggml_flash_attn_ext_set_sparse_mask(cur, sparse_mask);
 
+        // Split attention: GPU only attends rows in VRAM
+        if (n_kv_max == 0) {
+            const auto * kv_ctx = static_cast<const llama_kv_cache_context *>(mctx);
+            const auto * kv_split = kv_ctx->kv_split();
+            if (kv_split != nullptr) {
+                const uint32_t max_pages = kv_ctx->kv_stream_max_pages();
+                if (max_pages > 0) {
+                    const int64_t max_ring_rows = (int64_t)max_pages * 256;
+                    const int64_t n_kv_total = (int64_t)kv_ctx->get_n_kv();
+                    if (n_kv_total > max_ring_rows) {
+                        ggml_flash_attn_ext_set_n_kv_max(cur, (int32_t)max_ring_rows);
+                    }
+                }
+            }
+        }
+
         if (v_mla) {
             // turbo V decodes in the FWHT domain (see build_attn_v_unrotate): restore the latent before
             // the up-projection, which an output-side unrotate would come after. cur is the fresh FA output.

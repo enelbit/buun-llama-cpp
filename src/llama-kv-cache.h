@@ -1689,7 +1689,7 @@ private:
     size_t kv_stream_page_bytes = 0;
     size_t kv_stream_stage_bytes_stored = 0;
     llama_kv_split kv_split_worker;
-    llama_kv_split * kv_split() { return &kv_split_worker; }
+    const llama_kv_split * kv_split() const { return &kv_split_worker; }
     uint32_t kv_stream_max_pages() const { return kv_stream_page_bytes > 0 ? (uint32_t)(kv_stream_stage_bytes_stored / kv_stream_page_bytes) : 0; }
 
     kv_stream_runtime_owner kv_stream_runtime;
@@ -1857,7 +1857,7 @@ public:
     //
     // llama_kv_cache_context specific API
     //
-    llama_kv_split * kv_split() const { return kv ? kv->kv_split() : nullptr; }
+    const llama_kv_split * kv_split() const { return kv ? kv->kv_split() : nullptr; }
 
     uint32_t get_n_kv() const;
     uint32_t kv_stream_max_pages() const { return kv ? kv->kv_stream_max_pages() : 0; }
