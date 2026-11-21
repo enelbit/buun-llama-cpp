@@ -5649,7 +5649,7 @@ private:
                         // packed from cell 0: at the cells they were taken from, the rows
                         // would make the image saved reach as far as the pool did then
                         return try_automatic_vbr_restore(stage, task, {}, nullptr, false, &pinned[i].pin, true) &&
-                            stage.prompt.n_tokens() == task.tokens.size();
+                            static_cast<size_t>(stage.prompt.n_tokens()) == task.tokens.size();
                     }
                     // the state itself: a similarity search may prefer a shorter one it leads
                     auto source = prompt_cache->states.end();
@@ -5662,7 +5662,7 @@ private:
                     }
                     return source != prompt_cache->states.end() &&
                         stage.prompt_load_entry(*prompt_cache, source) &&
-                        stage.prompt.n_tokens() == task.tokens.size();
+                        static_cast<size_t>(stage.prompt.n_tokens()) == task.tokens.size();
                 };
                 if (restore()) {
                     // the image reaches as far as the cache has been written
