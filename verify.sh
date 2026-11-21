@@ -100,6 +100,7 @@ cmake --build "$BUILD_DIR" --target clean 2>&1 | tail -1
 
 echo -e "${BOLD}▶ Compilando desde cero (llama-server + llama-bench)...${NC}"
 echo -e "${CYAN}  (Esto puede tardar varios minutos)${NC}"
+grep -q "LLAMA_ALL_WARNINGS_3RD_PARTY:BOOL=OFF" "$BUILD_DIR/CMakeCache.txt" 2>/dev/null || echo "LLAMA_ALL_WARNINGS_3RD_PARTY:BOOL=OFF" >> "$BUILD_DIR/CMakeCache.txt"
 cmake --build "$BUILD_DIR" --target llama-server llama-bench -j"$NPROC" 2>&1 | tee "$LOG_FILE" > /dev/null
 BUILD_EXIT=${PIPESTATUS[0]}
 
