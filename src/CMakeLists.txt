@@ -43,6 +43,7 @@ set(LLAMA_CORE_SOURCES
             llama-impl.cpp
             llama-io.cpp
             llama-kv-cache.cpp
+            llama-kv-split.cpp
             llama-kv-stream-plan.cpp
             llama-kv-stream-config.cpp
             llama-kv-stream-softmax.cpp

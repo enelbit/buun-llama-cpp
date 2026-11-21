@@ -55,6 +55,7 @@ struct vbr_artifact_unit_descriptor;
 
 class llama_kv_cache : public llama_memory_i {
 public:
+    friend class llama_kv_cache_context;
     struct stream_copy_info {
         bool empty() const {
             assert(ssrc.size() == sdst.size());
