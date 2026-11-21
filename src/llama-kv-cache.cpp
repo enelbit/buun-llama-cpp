@@ -1254,6 +1254,8 @@ llama_kv_cache::llama_kv_cache(
                     kv_stream_dev = dev;
                     kv_stream_page_bytes = page_bytes;
                     kv_stream_stage_bytes_stored = kv_stream_stage_bytes;
+                    kv_split_worker.init(hparams.n_layer(), 256, std::max(1, (int)std::thread::hardware_concurrency()*2/3), nullptr, 0);
+                    kv_split_worker.start();
                 }
 
                 buft = kv_stream_buft;
