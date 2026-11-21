@@ -1252,6 +1252,8 @@ llama_kv_cache::llama_kv_cache(
                         throw std::runtime_error("failed to obtain CUDA block KV streaming buffer type");
                     }
                     kv_stream_dev = dev;
+                    kv_stream_page_bytes = page_bytes;
+                    kv_stream_stage_bytes_stored = kv_stream_stage_bytes;
                 }
 
                 buft = kv_stream_buft;

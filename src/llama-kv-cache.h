@@ -1684,6 +1684,10 @@ private:
 
     // Declared before ctxs_bufs so the custom buffers release their runtime
     // references before this owner releases the initial reference.
+    size_t kv_stream_page_bytes = 0;
+    size_t kv_stream_stage_bytes_stored = 0;
+    uint32_t kv_stream_max_pages() const { return kv_stream_page_bytes > 0 ? (uint32_t)(kv_stream_stage_bytes_stored / kv_stream_page_bytes) : 0; }
+
     kv_stream_runtime_owner kv_stream_runtime;
     std::vector<std::pair<ggml_context_ptr, ggml_backend_buffer_ptr>> ctxs_bufs;
 
@@ -1851,6 +1855,7 @@ public:
     //
 
     uint32_t get_n_kv() const;
+    uint32_t kv_stream_max_pages() const { return kv ? kv->kv_stream_max_pages() : 0; }
     // whether the ubatches of this batch read up to its last cell
     bool batch_stable() const { return n_used_batch > 0; }
 
