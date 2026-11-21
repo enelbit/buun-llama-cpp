@@ -615,7 +615,7 @@ static void ggml_cuda_vbr_kv_transcode_impl(
     }
 }
 
-void ggml_cuda_vbr_kv_transcode(ggml_backend_cuda_context & ctx,
+static void ggml_cuda_vbr_kv_transcode(ggml_backend_cuda_context & ctx,
                                 const ggml_vbr_transcode_params * p) {
     ggml_cuda_vbr_kv_transcode_impl(ctx, p, nullptr);
 }

@@ -9656,6 +9656,10 @@ static void ggml_compute_forward_flash_attn_ext_f16(
 void ggml_compute_forward_flash_attn_ext(
         const ggml_compute_params * params,
         ggml_tensor * dst) {
+    // Split attention: CPU worker handles these rows, skip here.
+    if (ggml_flash_attn_ext_get_split(dst) != NULL) {
+        return;
+    }
     switch (dst->op_params[3]) {
         case GGML_PREC_DEFAULT:
         case GGML_PREC_F32:
