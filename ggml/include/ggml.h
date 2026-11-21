@@ -2692,6 +2692,27 @@ extern "C" {
             struct ggml_tensor * a,
             bool                 sparse);
 
+    // Split attention: another processor attends over K/V rows that come before
+    // this op (e.g. the CPU over pages in host memory), and the op merges that
+    // part result into its own by log-sum-exp.
+    struct ggml_fa_split {
+        float          * q;
+        uint32_t       * q_ready;
+        const float    * out;
+        const float    * lse;
+        const uint32_t * out_ready;
+        float            scale;
+    };
+
+    GGML_API void ggml_flash_attn_ext_set_lse(
+            struct ggml_tensor * a,
+            float              * lse);
+
+    GGML_API void ggml_flash_attn_ext_set_split(
+            struct ggml_tensor          * a,
+            struct ggml_tensor          * tag,
+            const struct ggml_fa_split  * split);
+
     GGML_API bool ggml_flash_attn_ext_get_sparse_mask(
             const struct ggml_tensor * a);
 

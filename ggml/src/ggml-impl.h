@@ -179,6 +179,21 @@ static void ggml_set_op_params_i32(struct ggml_tensor * tensor, uint32_t i, int3
     ((int32_t *)(tensor->op_params))[i] = value;
 }
 
+#define GGML_FA_PARAM_LSE   6
+#define GGML_FA_PARAM_SPLIT 8
+
+static inline float * ggml_flash_attn_ext_get_lse(const struct ggml_tensor * t) {
+    float * p;
+    memcpy(&p, ((const int32_t *)t->op_params) + GGML_FA_PARAM_LSE, sizeof(p));
+    return p;
+}
+
+static inline const struct ggml_fa_split * ggml_flash_attn_ext_get_split(const struct ggml_tensor * t) {
+    const struct ggml_fa_split * p;
+    memcpy(&p, ((const int32_t *)t->op_params) + GGML_FA_PARAM_SPLIT, sizeof(p));
+    return p;
+}
+
 // Keep the expert window separate from the shared MUL_MAT precision/hint fields.
 enum {
     GGML_MMID_WINDOW_LO      = 4,

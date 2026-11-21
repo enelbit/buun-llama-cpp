@@ -6022,6 +6022,20 @@ void ggml_flash_attn_ext_set_sparse_mask(
     ggml_set_op_params_i32(a, 5, sparse);
 }
 
+void ggml_flash_attn_ext_set_lse(struct ggml_tensor * a, float * lse) {
+    GGML_ASSERT(a->op == GGML_OP_FLASH_ATTN_EXT);
+    GGML_ASSERT(lse != NULL);
+    memcpy(((int32_t *)a->op_params) + GGML_FA_PARAM_LSE, &lse, sizeof(lse));
+}
+
+void ggml_flash_attn_ext_set_split(struct ggml_tensor * a, struct ggml_tensor * tag, const struct ggml_fa_split * split) {
+    GGML_ASSERT(a->op == GGML_OP_FLASH_ATTN_EXT);
+    GGML_ASSERT(tag != NULL);
+    GGML_ASSERT(split != NULL);
+    memcpy(((int32_t *)a->op_params) + GGML_FA_PARAM_SPLIT, &split, sizeof(split));
+    a->src[5] = tag;
+}
+
 bool ggml_flash_attn_ext_get_sparse_mask(
         const struct ggml_tensor * a) {
     GGML_ASSERT(a->op == GGML_OP_FLASH_ATTN_EXT);
