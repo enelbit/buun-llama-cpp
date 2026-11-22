@@ -181,6 +181,7 @@ static void ggml_set_op_params_i32(struct ggml_tensor * tensor, uint32_t i, int3
 
 #define GGML_FA_PARAM_LSE   6
 #define GGML_FA_PARAM_SPLIT 8
+#define GGML_FA_SRC_TAG     5   // tensor i32[2]: [1]=tag value (split attention)
 
 static inline float * ggml_flash_attn_ext_get_lse(const struct ggml_tensor * t) {
     float * p;

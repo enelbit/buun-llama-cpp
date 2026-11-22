@@ -1858,13 +1858,26 @@ static __global__ void flash_attn_stream_k_fixup_general(
     *dst = dst_val / rowsum;
 }
 
+static __global__ void flash_attn_meta_to_lse(
+        const float2 * __restrict__ meta,
+        float * __restrict__ lse_out,
+        const int64_t nrows) {
+    const int64_t idx = (int64_t)blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= nrows) {
+        return;
+    }
+    const float2 ms = meta[idx];
+    lse_out[idx] = (ms.y > 0.0f) ? (ms.x + logf(ms.y)) : -INFINITY;
+}
+
 template<int D> // D == head size
 __launch_bounds__(D, 1)
 static __global__ void flash_attn_combine_results(
         const float  * VKQ_parts_ptr,
         const float2 * VKQ_meta_ptr,
         float * dst_ptr,
-        const int parallel_blocks) {
+        const int parallel_blocks,
+        float * lse_out = nullptr) {
     ggml_cuda_pdl_lc();
     const float  * GGML_CUDA_RESTRICT VKQ_parts = VKQ_parts_ptr;
     const float2 * GGML_CUDA_RESTRICT VKQ_meta  = VKQ_meta_ptr;
@@ -1914,6 +1927,12 @@ static __global__ void flash_attn_combine_results(
     }
 
     dst[tid] = VKQ_numerator / VKQ_denominator;
+
+    if (lse_out != nullptr && tid == 0) {
+        lse_out[j_dst_unrolled] = (VKQ_denominator > 0.0f)
+            ? (kqmax + logf(VKQ_denominator))
+            : -INFINITY;
+    }
 }
 
 void ggml_cuda_flash_attn_ext_compact_mask(
@@ -1925,8 +1944,12 @@ void launch_fattn(
     ggml_backend_cuda_context & ctx, ggml_tensor * dst, fattn_kernel_t fattn_kernel, const int nwarps, const size_t nbytes_shared,
     const int nbatch_fa, const bool need_f16_K, const bool need_f16_V, const bool stream_k, const bool use_sparse,
     const int warp_size = WARP_SIZE, const int32_t * ordered_ids = nullptr,
-    fattn_kernel_t schedule_kernel = nullptr, const bool async_kv_preload = false
+    fattn_kernel_t schedule_kernel = nullptr, const bool async_kv_preload = false,
+    float * lse_out = nullptr
 ) {
+    if (lse_out == nullptr && ggml_flash_attn_ext_get_split(dst) != nullptr) {
+        lse_out = ggml_flash_attn_ext_get_lse(dst);
+    }
     constexpr int ncols = ncols1 * ncols2;
 
     const ggml_tensor * Q = dst->src[0];
@@ -2182,6 +2205,8 @@ void launch_fattn(
         if (parallel_blocks > 1) {
             dst_tmp.alloc(parallel_blocks*ggml_nelements(KQV));
             dst_tmp_meta.alloc(parallel_blocks*ggml_nrows(KQV));
+        } else if (lse_out != nullptr) {
+            dst_tmp_meta.alloc(ggml_nrows(KQV));
         }
     }
 
@@ -2269,7 +2294,12 @@ void launch_fattn(
 
         const ggml_cuda_kernel_launch_params launch_params = ggml_cuda_kernel_launch_params(blocks_num_combine, block_dim_combine, nbytes_shared_combine, main_stream);
         ggml_cuda_kernel_launch(flash_attn_combine_results<DV>, launch_params,
-            dst_tmp.ptr, dst_tmp_meta.ptr, (float *) KQV->data, parallel_blocks);
+            dst_tmp.ptr, dst_tmp_meta.ptr, (float *) KQV->data, parallel_blocks, lse_out);
+    } else if (lse_out != nullptr && dst_tmp_meta.ptr != nullptr) {
+        const int64_t nrows = ggml_nrows(KQV);
+        const int threads = 256;
+        const int blocks = int((nrows + threads - 1) / threads);
+        flash_attn_meta_to_lse<<<blocks, threads, 0, main_stream>>>(dst_tmp_meta.ptr, lse_out, nrows);
     }
     CUDA_CHECK(cudaGetLastError());
 }

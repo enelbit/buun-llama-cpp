@@ -3404,6 +3404,21 @@ ggml_tensor * llm_graph_context::build_attn_mha(
                     const int64_t n_kv_total = (int64_t)kv_ctx->get_n_kv();
                     if (n_kv_total > max_ring_rows) {
                         ggml_flash_attn_ext_set_n_kv_max(cur, (int32_t)max_ring_rows);
+                        if (il >= 0 && (uint32_t)il < kv_split->n_layer) {
+                            auto * mutable_split = const_cast<llama_kv_split *>(kv_split);
+                            mutable_split->set_layer(
+                                il,
+                                k,
+                                v,
+                                static_cast<uint32_t>(q->ne[2]),
+                                static_cast<uint32_t>(q->ne[0]),
+                                kq_scale);
+                            if (kv_split->split_desc != nullptr) {
+                                ggml_tensor * tag = ggml_new_tensor_1d(ctx0, GGML_TYPE_I32, 2);
+                                ggml_set_name(tag, "kv_split_tag");
+                                ggml_flash_attn_ext_set_split(cur, tag, &kv_split->split_desc[il]);
+                            }
+                        }
                     }
                 }
             }

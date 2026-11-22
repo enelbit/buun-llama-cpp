@@ -1688,7 +1688,12 @@ private:
     // references before this owner releases the initial reference.
     size_t kv_stream_page_bytes = 0;
     size_t kv_stream_stage_bytes_stored = 0;
+    void * kv_split_pinned_ptr = nullptr;
+    size_t kv_split_pinned_size = 0;
     llama_kv_split kv_split_worker;
+public:
+    void kv_split_shutdown();
+private:
     const llama_kv_split * kv_split() const { return &kv_split_worker; }
     uint32_t kv_stream_max_pages() const { return kv_stream_page_bytes > 0 ? (uint32_t)(kv_stream_stage_bytes_stored / kv_stream_page_bytes) : 0; }
 

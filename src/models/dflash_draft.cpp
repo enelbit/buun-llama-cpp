@@ -37,6 +37,7 @@ void llama_model_dflash_draft::load_arch_hparams(llama_model_loader & ml) {
 }
 
 void llama_model_dflash_draft::load_arch_tensors(llama_model_loader & ml) {
+    (void)ml;
     LLAMA_LOAD_LOCALS;
 
     tok_embd    = create_tensor(tn(LLM_TENSOR_TOKEN_EMBD, "weight"), {n_embd, n_vocab}, TENSOR_NOT_REQUIRED);
@@ -200,6 +201,7 @@ void llm_graph_input_dflash::set_input(const llama_ubatch * ubatch) {
         }
 
         // Sliding window: if src has more tokens than ctx_len, take the most recent
+        (void)src_n_enc;
         const int64_t src_real = src_n_real > 0 ? src_n_real : 0;
         const int64_t n_copy  = std::min(src_real, ctx_len);
         const int64_t win_off = (src_real > ctx_len) ? (src_real - ctx_len) : 0;

@@ -8,6 +8,7 @@
 #include "fattn-tile.cuh"
 #include "fattn-vec.cuh"
 #include "fattn-wmma-f16.cuh"
+#include "fattn-split-kernels.cuh"
 #include "fattn.cuh"
 #include "ggml-backend-impl.h"
 
@@ -5763,6 +5764,27 @@ void ggml_cuda_flash_attn_ext(ggml_backend_cuda_context & ctx, ggml_tensor * dst
             dst->src[0] = &Q_rot_decode;
         }
 
+        float * lse_out = nullptr;
+        const ggml_fa_split * fa_split = ggml_flash_attn_ext_get_split(dst);
+        if (fa_split != nullptr) {
+            lse_out = ggml_flash_attn_ext_get_lse(dst);
+            const int n_tok_q = (int)Q->ne[1];
+            const int n_head_q = (int)Q->ne[2];
+            const int D_split = (int)Q->ne[0];
+            const unsigned gy_q = n_head_q > 65535 ? 65535u : (unsigned)n_head_q;
+            const unsigned bx_q = D_split > 1024 ? 1024u : (unsigned)(D_split > 0 ? D_split : 1);
+            const dim3 grid_q((unsigned)(n_tok_q > 0 ? n_tok_q : 1), gy_q, 1);
+            const dim3 block_q(bx_q, 1, 1);
+            kv_split_q<<<grid_q, block_q, 0, stream>>>(
+                (const char *)Q->data, Q->nb[1], Q->nb[2], fa_split->q, n_tok_q, n_head_q, D_split);
+            const ggml_tensor * tag_t = dst->src[GGML_FA_SRC_TAG];
+            const int32_t * tag_ptr = tag_t ? (const int32_t *)tag_t->data : nullptr;
+            if (tag_ptr != nullptr && fa_split->q_ready != nullptr) {
+                kv_split_signal<<<1, 1, 0, stream>>>(tag_ptr, fa_split->q_ready);
+            }
+        }
+        (void)lse_out;
+
         switch (ggml_cuda_get_best_fattn_kernel(ggml_cuda_get_device(), dst)) {
             case BEST_FATTN_KERNEL_NONE:
                 GGML_ABORT("fatal error");
@@ -5783,6 +5805,26 @@ void ggml_cuda_flash_attn_ext(ggml_backend_cuda_context & ctx, ggml_tensor * dst
         if (orig_q_decode) dst->src[0] = orig_q_decode;
         if (orig_k_decode) dst->src[1] = orig_k_decode;
         if (orig_v_decode) dst->src[2] = orig_v_decode;
+
+        if (fa_split != nullptr) {
+            const ggml_tensor * tag_t = dst->src[GGML_FA_SRC_TAG];
+            const int32_t * tag_ptr = tag_t ? (const int32_t *)tag_t->data : nullptr;
+            if (tag_ptr != nullptr && fa_split->out_ready != nullptr) {
+                kv_split_wait<<<1, 1, 0, stream>>>(tag_ptr, fa_split->out_ready);
+            }
+            if (lse_out != nullptr && fa_split->out != nullptr && fa_split->lse != nullptr) {
+                const int n_tok_m = (int)dst->ne[1];
+                const int n_head_m = (int)dst->ne[2];
+                const int D_merge = (int)dst->ne[0];
+                const unsigned gy_m = n_head_m > 65535 ? 65535u : (unsigned)n_head_m;
+                const unsigned bx_m = D_merge > 1024 ? 1024u : (unsigned)(D_merge > 0 ? D_merge : 1);
+                const dim3 grid_m((unsigned)(n_tok_m > 0 ? n_tok_m : 1), gy_m, 1);
+                const dim3 block_m(bx_m, 1, 1);
+                kv_split_merge<<<grid_m, block_m, 0, stream>>>(
+                    (char *)dst->data, dst->nb[1], dst->nb[2],
+                    lse_out, fa_split->out, fa_split->lse, n_tok_m, n_head_m, D_merge);
+            }
+        }
         // K/V fp16 buffers are persistent (grow-only), no free needed
     }
 

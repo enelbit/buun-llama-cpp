@@ -108,6 +108,8 @@ llama_memory_hybrid_idx::llama_memory_hybrid_idx(
             kv_size, n_seq_max, n_pad, n_swa, swa_type,
             nullptr, filter_idx, nullptr, nullptr, llama_memory_vbr_params{}, 0, "idx_");
     }()) {
+    (void)vbr;
+    (void)filter_idx;
 }
 
 void llama_memory_hybrid_idx::index_state_restored() {

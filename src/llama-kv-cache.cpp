@@ -1,3 +1,39 @@
+#include <dlfcn.h>
+namespace {
+using cudaHostAlloc_fn = int (*)(void **, size_t, unsigned int);
+using cudaFreeHost_fn  = int (*)(void *);
+
+static bool kv_alloc_host_pinned(void ** ptr, size_t bytes) {
+    static cudaHostAlloc_fn fn_alloc = nullptr;
+    static bool checked = false;
+    if (!checked) {
+        checked = true;
+        void * h = dlopen("libcudart.so", RTLD_LAZY | RTLD_LOCAL);
+        if (!h) h = dlopen("libcudart.so.12", RTLD_LAZY | RTLD_LOCAL);
+        if (h) fn_alloc = reinterpret_cast<cudaHostAlloc_fn>(dlsym(h, "cudaHostAlloc"));
+    }
+    if (fn_alloc && ptr && bytes > 0) {
+        return fn_alloc(ptr, bytes, 2u /* cudaHostAllocMapped */) == 0;
+    }
+    return false;
+}
+
+static void kv_free_host_pinned(void * ptr) {
+    if (!ptr) return;
+    static cudaFreeHost_fn fn_free = nullptr;
+    static bool checked = false;
+    if (!checked) {
+        checked = true;
+        void * h = dlopen("libcudart.so", RTLD_LAZY | RTLD_LOCAL);
+        if (!h) h = dlopen("libcudart.so.12", RTLD_LAZY | RTLD_LOCAL);
+        if (h) fn_free = reinterpret_cast<cudaFreeHost_fn>(dlsym(h, "cudaFreeHost"));
+    }
+    if (fn_free) {
+        fn_free(ptr);
+    }
+}
+}
+
 #include "llama-kv-cache.h"
 #include "llama-kv-stream-plan.h"
 #include "llama-kv-cache-mask.h"
@@ -1254,7 +1290,28 @@ llama_kv_cache::llama_kv_cache(
                     kv_stream_dev = dev;
                     kv_stream_page_bytes = page_bytes;
                     kv_stream_stage_bytes_stored = kv_stream_stage_bytes;
-                    kv_split_worker.init(hparams.n_layer(), 256, std::max(1, (int)std::thread::hardware_concurrency()*2/3), nullptr, 0);
+                    const uint32_t split_max_tok = std::max<uint32_t>(256, std::min<uint32_t>(kv_stream_max_pages() * 256u, 4096));
+                    const size_t n_lay = hparams.n_layer();
+                    const size_t q_sz  = (((n_lay * split_max_tok * 4u * 128u * sizeof(float)) + 255u) & ~size_t(255u));
+                    const size_t out_sz = q_sz;
+                    const size_t lse_sz = (((n_lay * split_max_tok * 4u * sizeof(float)) + 255u) & ~size_t(255u));
+                    const size_t flg_sz = (((2u * n_lay * sizeof(uint32_t)) + 255u) & ~size_t(255u));
+                    const size_t total_pinned = q_sz + out_sz + lse_sz + flg_sz;
+
+                    if (kv_split_pinned_ptr == nullptr && total_pinned > 0) {
+                        void * pinned_tmp = nullptr;
+                        if (kv_alloc_host_pinned(&pinned_tmp, total_pinned) && pinned_tmp != nullptr) {
+                            kv_split_pinned_ptr = pinned_tmp;
+                            kv_split_pinned_size = total_pinned;
+                        }
+                    }
+
+                    kv_split_worker.init(
+                        n_lay,
+                        split_max_tok,
+                        std::max(1, (int)std::thread::hardware_concurrency() * 2 / 3),
+                        kv_split_pinned_ptr,
+                        kv_split_pinned_size);
                     kv_split_worker.start();
                 }
 
@@ -14134,6 +14191,15 @@ llama_kv_cache_context::llama_kv_cache_context(
 
 bool llama_kv_cache::vbr_map_reads(uint32_t n_kv) {
     return !vbr_vmm_active() || vbr_vmm_try_map(n_kv);
+}
+
+void llama_kv_cache::kv_split_shutdown() {
+    kv_split_worker.stop_worker();
+    if (kv_split_pinned_ptr != nullptr) {
+        kv_free_host_pinned(kv_split_pinned_ptr);
+        kv_split_pinned_ptr = nullptr;
+        kv_split_pinned_size = 0;
+    }
 }
 
 llama_kv_cache_context::~llama_kv_cache_context() = default;

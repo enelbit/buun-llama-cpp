@@ -4,34 +4,82 @@
 #include <cmath>
 #include <cstring>
 
-llama_kv_split::~llama_kv_split() {
-    stop_worker();
+static inline size_t align_up_256(size_t n) {
+    return (n + 255u) & ~size_t(255u);
 }
 
-void llama_kv_split::init(uint32_t n_layer_, uint32_t max_tok_, uint32_t n_threads_, void * pinned_base, size_t /*pinned_size*/) {
+llama_kv_split::~llama_kv_split() {
+    stop_worker();
+    delete[] split_desc;
+    split_desc = nullptr;
+}
+
+void llama_kv_split::init(uint32_t n_layer_, uint32_t max_tok_, uint32_t n_threads_, void * pinned_base, size_t pinned_size) {
     n_layer   = n_layer_;
     max_tok   = max_tok_;
     n_threads = std::max(1u, n_threads_);
-    layers.resize(n_layer);
+    layers.assign(n_layer, {});
 
-    // Layout of pinned memory:
-    // [split_q | split_out | split_lse | split_flags]
-    size_t q_bytes = (size_t)n_layer * max_tok * 4 * 128 * sizeof(float); // placeholder, set per-layer
-    // We'll compute exact sizes after layers are set. For now, allocate generously.
-    // The caller allocates pinned memory and passes the base pointer.
-    // We'll compute offsets here:
-    // split_q:   n_layer * max_tok * n_head * head_dim * sizeof(float)
-    // split_out: same
-    // split_lse: n_layer * max_tok * n_head * sizeof(float)
-    // split_flags: 2 * n_layer * sizeof(uint32_t)
-    // Since n_head and head_dim vary per layer, we use max across layers.
-    // For simplicity, assume uniform (which is the case for Qwen3.6-35B).
-    // The caller should allocate enough; we'll use the first layer's dims.
-    // This is a simplification - in practice all layers have the same n_head and head_dim.
+    delete[] split_desc;
+    split_desc  = nullptr;
+    split_q     = nullptr;
+    split_out   = nullptr;
+    split_lse   = nullptr;
+    split_flags = nullptr;
+
+    if (n_layer == 0 || max_tok == 0 || pinned_base == nullptr || pinned_size == 0) {
+        return;
+    }
+
+    split_desc = new ggml_fa_split[n_layer];
+    std::memset(split_desc, 0, sizeof(ggml_fa_split) * n_layer);
+
+    const size_t flg_bytes = align_up_256((size_t)2 * n_layer * sizeof(uint32_t));
+    if (flg_bytes + 3 * 256u > pinned_size) {
+        delete[] split_desc;
+        split_desc = nullptr;
+        return;
+    }
+
+    const size_t usable_bytes = pinned_size - flg_bytes;
+    // Reparto 16:16:1 entre split_q, split_out y split_lse (alineado a 256 bytes)
+    const size_t q_bytes   = align_up_256((usable_bytes * 16u) / 33u);
+    const size_t out_bytes = align_up_256((usable_bytes * 16u) / 33u);
+    const size_t lse_bytes = align_up_256(usable_bytes > (q_bytes + out_bytes) ? (usable_bytes - q_bytes - out_bytes) : 256u);
+
+    if (q_bytes + out_bytes + lse_bytes + flg_bytes > pinned_size) {
+        delete[] split_desc;
+        split_desc = nullptr;
+        return;
+    }
+
+    auto * p = static_cast<uint8_t *>(pinned_base);
+    split_q     = reinterpret_cast<float *>(p);
+    split_out   = reinterpret_cast<float *>(p + q_bytes);
+    split_lse   = reinterpret_cast<float *>(p + q_bytes + out_bytes);
+    split_flags = reinterpret_cast<uint32_t *>(p + q_bytes + out_bytes + lse_bytes);
+    std::memset(split_flags, 0, flg_bytes);
 }
 
 void llama_kv_split::set_layer(int32_t ikv, ggml_tensor * k, ggml_tensor * v, uint32_t n_head, uint32_t head_dim, float scale) {
+    if (ikv < 0 || (uint32_t)ikv >= n_layer) {
+        return;
+    }
     layers[ikv] = { k, v, n_head, head_dim, scale };
+
+    if (split_desc == nullptr) {
+        return;
+    }
+
+    const size_t qv_stride  = (size_t)max_tok * n_head * head_dim;
+    const size_t lse_stride = (size_t)max_tok * n_head;
+
+    split_desc[ikv].q         = split_q     ? (split_q     + (size_t)ikv * qv_stride)  : nullptr;
+    split_desc[ikv].q_ready   = split_flags ? (split_flags + (size_t)ikv)              : nullptr;
+    split_desc[ikv].out       = split_out   ? (split_out   + (size_t)ikv * qv_stride)  : nullptr;
+    split_desc[ikv].lse       = split_lse   ? (split_lse   + (size_t)ikv * lse_stride) : nullptr;
+    split_desc[ikv].out_ready = split_flags ? (split_flags + (size_t)n_layer + ikv)    : nullptr;
+    split_desc[ikv].scale     = scale;
 }
 
 void llama_kv_split::start() {

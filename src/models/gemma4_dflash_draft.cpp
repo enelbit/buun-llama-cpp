@@ -62,6 +62,7 @@ void llama_model_gemma4_dflash_draft::load_arch_hparams(llama_model_loader & ml)
 }
 
 void llama_model_gemma4_dflash_draft::load_arch_tensors(llama_model_loader & ml) {
+    (void)ml;
     LLAMA_LOAD_LOCALS;
 
     // tied embeddings — shared from the target model at runtime (absent in this GGUF)
@@ -201,6 +202,7 @@ void llm_graph_input_gemma4_dflash::set_input(const llama_ubatch * ubatch) {
             }
         }
 
+        (void)src_n_enc;
         const int64_t src_real = src_n_real > 0 ? src_n_real : 0;
         const int64_t n_copy  = std::min(src_real, ctx_len);
         const int64_t win_off = (src_real > ctx_len) ? (src_real - ctx_len) : 0;

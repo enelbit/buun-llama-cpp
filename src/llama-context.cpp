@@ -1,4 +1,5 @@
 #include "llama-context.h"
+#include "llama-kv-cache.h"
 #include "llama-vbr-codec.h"
 
 // minimum number of output rows reserved at context creation (covers MTP verification widths);
@@ -6198,6 +6199,41 @@ ggml_status llama_context::graph_compute(
         set_n_threads_fn.second(set_n_threads_fn.first, n_threads);
     }
 
+
+    if (memory != nullptr && gf != nullptr) {
+        const auto * kv_ctx = dynamic_cast<const llama_kv_cache_context *>(memory.get());
+        const auto * kv_split = kv_ctx ? kv_ctx->kv_split() : nullptr;
+        if (kv_split != nullptr && kv_split->n_layer > 0) {
+            const uint32_t max_pages = kv_ctx->kv_stream_max_pages();
+            const int64_t n_kv_total = (int64_t)kv_ctx->get_n_kv();
+            if (max_pages > 0) {
+                const int64_t max_ring_rows = (int64_t)max_pages * 256;
+                if (n_kv_total > max_ring_rows) {
+                    const uint32_t n_rows = static_cast<uint32_t>(n_kv_total - max_ring_rows);
+                    const int n_nodes = ggml_graph_n_nodes(gf);
+                    ggml_tensor * node0 = n_nodes > 0 ? ggml_graph_node(gf, 0) : nullptr;
+                    const uint32_t n_tok  = static_cast<uint32_t>(std::max<int64_t>(1, node0 ? node0->ne[1] : 1));
+                    auto * mutable_split = const_cast<llama_kv_split *>(kv_split);
+                    mutable_split->submit(n_rows, n_tok);
+                    const int32_t active_tag = static_cast<int32_t>(mutable_split->tag);
+                    for (int i = 0; i < n_nodes; ++i) {
+                        ggml_tensor * node = ggml_graph_node(gf, i);
+                        if (node && node->op == GGML_OP_FLASH_ATTN_EXT && node->src[5] != nullptr) {
+                            ggml_tensor * tag_t = node->src[5];
+                            if (tag_t->data != nullptr) {
+                                int32_t * tag_host = static_cast<int32_t *>(tag_t->data);
+                                tag_host[1] = active_tag;
+                            }
+                            if (tag_t->buffer != nullptr) {
+                                int32_t tag_vals[2] = { 0, active_tag };
+                                ggml_backend_tensor_set(tag_t, tag_vals, 0, sizeof(tag_vals));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     auto status = ggml_backend_sched_graph_compute_async(sched.get(), gf);
     if (status != GGML_STATUS_SUCCESS) {
