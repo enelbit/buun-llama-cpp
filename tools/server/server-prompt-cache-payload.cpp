@@ -820,7 +820,7 @@ bool server_prompt_cache_payload::prepare_vbr_refresh(
         return replacement.valid();
     }
     auto refreshed = server_prompt_cache_vbr_variant_set::create(
-        std::move(incoming), std::move(best));
+        std::move(incoming), best);
     if (!refreshed) {
         return false;
     }
