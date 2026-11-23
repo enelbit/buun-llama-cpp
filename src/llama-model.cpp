@@ -4475,7 +4475,7 @@ void llama_model_share_tensors(llama_model * dst, const llama_model * src) {
     struct shared_transform {
         ggml_tensor ** weight;
         llama_hadamard_rotations * map;
-        llama_hadamard_transform transform;
+        llama_hadamard_transform transform {};
     };
     std::vector<shared_transform> transforms;
     for (const auto & a : attachments) {
