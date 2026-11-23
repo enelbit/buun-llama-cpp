@@ -1,3 +1,4 @@
+#include "cross-ring-interleave.h"
 #if defined(GGML_USE_HIP)
 #include "vendors/hip.h"
 #else
