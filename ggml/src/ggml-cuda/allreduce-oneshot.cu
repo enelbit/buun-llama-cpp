@@ -48,7 +48,7 @@ struct ggml_cuda_ar_oneshot {
 };
 // flags live in mapped host memory: system-scope acquire loads and release stores, with a system fence after
 // each store so the flag is pushed out while the same thread keeps polling
-static __device__ __forceinline__ int ar1_load_flag(const int * p) {
+[[maybe_unused]] static __device__ __forceinline__ int ar1_load_flag(const int * p) {
 #if __CUDA_ARCH__ >= GGML_CUDA_CC_VOLTA
     int v;
     asm volatile("ld.acquire.sys.global.u32 %0, [%1];" : "=r"(v) : "l"(p) : "memory");
@@ -207,10 +207,10 @@ static constexpr int AR1_LL_THREADS   = 192;
 static constexpr int AR1_LL_MAX_RANKS = 8;
 static_assert(AR1_MB_BLOCKS % AR1_LL_BLOCKS == 0, "the LL kernel advances the launch counter by AR1_MB_BLOCKS");
 
-static __device__ __forceinline__ void ar1_st_line(float4 * p, float4 v) {
+[[maybe_unused]] static __device__ __forceinline__ void ar1_st_line(float4 * p, float4 v) {
     asm volatile("st.relaxed.sys.global.v4.f32 [%0], {%1, %2, %3, %4};" :: "l"(p), "f"(v.x), "f"(v.y), "f"(v.z), "f"(v.w) : "memory");
 }
-static __device__ __forceinline__ float4 ar1_ld_line(const float4 * p) {
+[[maybe_unused]] static __device__ __forceinline__ float4 ar1_ld_line(const float4 * p) {
     float4 v;
     asm volatile("ld.relaxed.sys.global.v4.f32 {%0, %1, %2, %3}, [%4];" : "=f"(v.x), "=f"(v.y), "=f"(v.z), "=f"(v.w) : "l"(p) : "memory");
     return v;
