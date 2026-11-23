@@ -39,23 +39,23 @@ namespace {
 // dispatch independent of Python, PyTorch, NVRTC, and a writable JIT cache.
 class fp8_mma_op {
 public:
-    static constexpr MmaType kMmaType = MmaType::MMA;
+    [[maybe_unused]] static constexpr MmaType kMmaType = MmaType::MMA;
     using MmaShape = Shape<16, 8, 16>;
     using ValTypeC = float;
     using ValTypeD = float;
 
-    static constexpr uint32_t kATypeBits = 16;
-    static constexpr uint32_t kBTypeBits = 16;
-    static constexpr uint32_t kCTypeBits = 32;
-    static constexpr uint32_t kDTypeBits = 32;
-    static constexpr bool kNativeMixed = false;
+    [[maybe_unused]] static constexpr uint32_t kATypeBits = 16;
+    [[maybe_unused]] static constexpr uint32_t kBTypeBits = 16;
+    [[maybe_unused]] static constexpr uint32_t kCTypeBits = 32;
+    [[maybe_unused]] static constexpr uint32_t kDTypeBits = 32;
+    [[maybe_unused]] static constexpr bool kNativeMixed = false;
 
     using ARegisters = uint32_t[4];
     using BRegisters = uint32_t[2];
     using CRegisters = float[4];
     using DRegisters = float[4];
 
-    __device__ __forceinline__ static void fma(uint32_t * a, uint32_t * b, float * c, float * d) {
+    [[maybe_unused]] __device__ __forceinline__ static void fma(uint32_t * a, uint32_t * b, float * c, float * d) {
         asm volatile(
             "mma.sync.aligned.m16n8k16.row.col.f32.bf16.bf16.f32 "
             "{%0, %1, %2, %3}, {%4, %5, %6, %7}, {%8, %9}, {%10, %11, %12, %13};\n"
@@ -69,74 +69,74 @@ public:
 template <uint32_t N, uint32_t K>
 class fp8_layer_config {
 public:
-    static constexpr auto kShapeN = N;
-    static constexpr auto kShapeK = K;
-    static constexpr auto kPadShapeN = 0u;
-    static constexpr auto kPadShapeK = 0u;
-    static constexpr auto kNumExperts = 0u;
-    static constexpr auto kInputScaleGroupSize = 0u;
-    static constexpr auto kWeightScaleGroupSize = 0u;
-    static constexpr auto kWeightScaleGroupSizeN = 0u;
-    static constexpr auto kWeightScaleType = WeightScaleType::CHANNEL;
-    static constexpr auto kWeightScale2Type = WeightScale2Type::NONE;
-    static constexpr auto kUseIntWeightScale = false;
-    static constexpr auto kUseFusedE8m0Scale = false;
-    static constexpr auto kHasZeroPoint = false;
-    static constexpr auto kIsFpZeroPoint = false;
-    static constexpr auto kHasBias = false;
-    static constexpr auto kMmaType = MmaType::MMA;
-    static constexpr auto kUsePackedKLayout = false;
-    static constexpr auto kMmaTypeId = 0u;
-    static constexpr auto kIsChannelWeightScale = true;
-    static constexpr auto kIsBlockWeightScale = false;
-    static constexpr auto kIsGroupWeightScale = false;
-    static constexpr auto kIsTensorWeightScale = false;
-    static constexpr auto kIsChannelWeightScale2 = false;
-    static constexpr auto kIsTensorWeightScale2 = false;
-    static constexpr auto kHasChannelWeightScale = true;
-    static constexpr auto kHasTensorWeightScale = false;
-    static constexpr auto kHasInputScale = false;
+    [[maybe_unused]] static constexpr auto kShapeN = N;
+    [[maybe_unused]] static constexpr auto kShapeK = K;
+    [[maybe_unused]] static constexpr auto kPadShapeN = 0u;
+    [[maybe_unused]] static constexpr auto kPadShapeK = 0u;
+    [[maybe_unused]] static constexpr auto kNumExperts = 0u;
+    [[maybe_unused]] static constexpr auto kInputScaleGroupSize = 0u;
+    [[maybe_unused]] static constexpr auto kWeightScaleGroupSize = 0u;
+    [[maybe_unused]] static constexpr auto kWeightScaleGroupSizeN = 0u;
+    [[maybe_unused]] static constexpr auto kWeightScaleType = WeightScaleType::CHANNEL;
+    [[maybe_unused]] static constexpr auto kWeightScale2Type = WeightScale2Type::NONE;
+    [[maybe_unused]] static constexpr auto kUseIntWeightScale = false;
+    [[maybe_unused]] static constexpr auto kUseFusedE8m0Scale = false;
+    [[maybe_unused]] static constexpr auto kHasZeroPoint = false;
+    [[maybe_unused]] static constexpr auto kIsFpZeroPoint = false;
+    [[maybe_unused]] static constexpr auto kHasBias = false;
+    [[maybe_unused]] static constexpr auto kMmaType = MmaType::MMA;
+    [[maybe_unused]] static constexpr auto kUsePackedKLayout = false;
+    [[maybe_unused]] static constexpr auto kMmaTypeId = 0u;
+    [[maybe_unused]] static constexpr auto kIsChannelWeightScale = true;
+    [[maybe_unused]] static constexpr auto kIsBlockWeightScale = false;
+    [[maybe_unused]] static constexpr auto kIsGroupWeightScale = false;
+    [[maybe_unused]] static constexpr auto kIsTensorWeightScale = false;
+    [[maybe_unused]] static constexpr auto kIsChannelWeightScale2 = false;
+    [[maybe_unused]] static constexpr auto kIsTensorWeightScale2 = false;
+    [[maybe_unused]] static constexpr auto kHasChannelWeightScale = true;
+    [[maybe_unused]] static constexpr auto kHasTensorWeightScale = false;
+    [[maybe_unused]] static constexpr auto kHasInputScale = false;
 };
 
 class fp8_compute_config {
 public:
-    static constexpr auto kUseF16Accum = false;
-    static constexpr auto kUseBatchInvariant = false;
-    static constexpr auto kUseMMajorInputScale = false;
-    static constexpr auto kGemmType = GemmType::DENSE;
-    static constexpr auto kGemmTypeId = 0u;
-    static constexpr auto kIsIndexedGemm = false;
-    static constexpr auto kIsGroupedGemm = false;
-    static constexpr auto kIsGroupedContiguousGemm = false;
-    static constexpr auto kIsGroupedMaskedGemm = false;
+    [[maybe_unused]] static constexpr auto kUseF16Accum = false;
+    [[maybe_unused]] static constexpr auto kUseBatchInvariant = false;
+    [[maybe_unused]] static constexpr auto kUseMMajorInputScale = false;
+    [[maybe_unused]] static constexpr auto kGemmType = GemmType::DENSE;
+    [[maybe_unused]] static constexpr auto kGemmTypeId = 0u;
+    [[maybe_unused]] static constexpr auto kIsIndexedGemm = false;
+    [[maybe_unused]] static constexpr auto kIsGroupedGemm = false;
+    [[maybe_unused]] static constexpr auto kIsGroupedContiguousGemm = false;
+    [[maybe_unused]] static constexpr auto kIsGroupedMaskedGemm = false;
 };
 
 template <uint32_t Threads, uint32_t Raster, bool UseStreamK>
 class fp8_tuning_config {
 public:
-    static constexpr auto kUseStreamK = UseStreamK;
-    static constexpr auto kNumStages = 3u;
-    static constexpr auto kNumCtasPerSm = 1u;
-    static constexpr auto kUseWarpSpec = false;
-    static constexpr auto kUseMBarrier = false;
-    static constexpr auto kUseCpAsync = true;
-    static constexpr auto kUseTma = false;
-    static constexpr auto kUseTmaA = false;
-    static constexpr auto kUseTmaAS = false;
-    static constexpr auto kUseTmaB = false;
-    static constexpr auto kUseTmaC = false;
-    static constexpr auto kUseTmaBS = false;
-    static constexpr auto kUseTmaBS2 = false;
-    static constexpr auto kUseTmaBZP = false;
-    static constexpr auto kUseTmaBias = false;
-    static constexpr auto kReduceOverlapLastStageOnly = false;
-    static constexpr auto kNumWriteSplits = 1u;
-    static constexpr auto kMultiCastSizeA = 1u;
-    static constexpr auto kMultiCastSizeB = 1u;
-    static constexpr auto kRasterGroupM = Raster;
-    static constexpr auto kNumThreads = Threads;
-    static constexpr auto kNumMathThreads = Threads;
-    static constexpr auto kNumLoadThreads = Threads;
+    [[maybe_unused]] static constexpr auto kUseStreamK = UseStreamK;
+    [[maybe_unused]] static constexpr auto kNumStages = 3u;
+    [[maybe_unused]] static constexpr auto kNumCtasPerSm = 1u;
+    [[maybe_unused]] static constexpr auto kUseWarpSpec = false;
+    [[maybe_unused]] static constexpr auto kUseMBarrier = false;
+    [[maybe_unused]] static constexpr auto kUseCpAsync = true;
+    [[maybe_unused]] static constexpr auto kUseTma = false;
+    [[maybe_unused]] static constexpr auto kUseTmaA = false;
+    [[maybe_unused]] static constexpr auto kUseTmaAS = false;
+    [[maybe_unused]] static constexpr auto kUseTmaB = false;
+    [[maybe_unused]] static constexpr auto kUseTmaC = false;
+    [[maybe_unused]] static constexpr auto kUseTmaBS = false;
+    [[maybe_unused]] static constexpr auto kUseTmaBS2 = false;
+    [[maybe_unused]] static constexpr auto kUseTmaBZP = false;
+    [[maybe_unused]] static constexpr auto kUseTmaBias = false;
+    [[maybe_unused]] static constexpr auto kReduceOverlapLastStageOnly = false;
+    [[maybe_unused]] static constexpr auto kNumWriteSplits = 1u;
+    [[maybe_unused]] static constexpr auto kMultiCastSizeA = 1u;
+    [[maybe_unused]] static constexpr auto kMultiCastSizeB = 1u;
+    [[maybe_unused]] static constexpr auto kRasterGroupM = Raster;
+    [[maybe_unused]] static constexpr auto kNumThreads = Threads;
+    [[maybe_unused]] static constexpr auto kNumMathThreads = Threads;
+    [[maybe_unused]] static constexpr auto kNumLoadThreads = Threads;
 };
 
 using fp8_a = FloatingPointType<16, 8, 7>;
