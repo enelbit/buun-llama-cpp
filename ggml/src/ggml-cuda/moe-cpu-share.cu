@@ -897,7 +897,7 @@ ggml_moe_cpu_share_args ggml_moe_cpu_share_merge(const ggml_tensor * experts) {
     args.skip = d.st->skip;
     args.ids_stride = h.pending_ids_stride;
     args.y = h.d_y;
-    args.done = (const uint32_t *) &h.d_mb->done;
+    args.done = (const uint32_t *) (void *) &h.d_mb->done;
     args.ticket = &d.st->ticket;
     return args;
 }
