@@ -1,4 +1,5 @@
 #include "fp8-channel-bf16.cuh"
+#include "fp8-channel-bf16.h"
 
 #if !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA) && CUDART_VERSION >= 12080
 #include "unary.cuh"
