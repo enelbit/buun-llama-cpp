@@ -140,7 +140,7 @@ struct common_sampler {
     // Greedy chain whose only logit change is a sparse bias (user biases, ignore_eos,
     // suppress tokens): sampling is the argmax of the biased logits. Biases are sorted
     // by token with duplicates summed.
-    bool greedy_argmax;
+    bool greedy_argmax = false;
     std::vector<llama_logit_bias> greedy_bias;
 
     void reset() {
