@@ -185,6 +185,7 @@ static void ggml_cuda_mul_mat_q_impl(
     const int64_t s3  =  dst->nb[3] / ts_dst;
 
     const bool fallback = ne01 % 128 != 0;
+    (void)fallback;
 
     const ggml_prec prec_src1 = ggml_cuda_mmq_get_prec_src1(src0, dst, cc);
 
