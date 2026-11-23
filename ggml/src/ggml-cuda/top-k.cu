@@ -1,4 +1,5 @@
 #include "argsort.cuh"
+#include "top-k.h"
 #include "top-k.cuh"
 
 #ifdef GGML_CUDA_USE_CUB
