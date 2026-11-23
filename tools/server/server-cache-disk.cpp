@@ -596,7 +596,7 @@ bool server_cache_disk_tier::build_index_from_files(std::string & error) {
         files.push_back(item.path().string());
     }
     std::sort(files.begin(), files.end());
-    bool changed = false;
+    [[maybe_unused]] bool changed = false;
     for (const auto & path : files) {
         const std::string name = fs::path(path).filename().string();
         bool known = false;
