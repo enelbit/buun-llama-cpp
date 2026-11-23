@@ -1,5 +1,4 @@
 #include "argsort.cuh"
-#include "top-k.h"
 #include "top-k.cuh"
 
 #ifdef GGML_CUDA_USE_CUB
@@ -18,6 +17,8 @@ using namespace cub;
 #if defined(GGML_CUDA_USE_CUB) && !defined(GGML_USE_HIP) && !defined(GGML_USE_MUSA)
 namespace {
 // Keep score keys in registers across radix passes, then write the k survivors unordered.
+    void register_top_k_launch(const float*, int*, int, int, int, cudaStream_t);
+    bool register_top_k_wins(int64_t, int64_t, int64_t);
 constexpr int register_top_k_threads=1024;
 __device__ uint32_t register_top_k_ordered(uint32_t b) {
     // CUB treats signed zeros as equivalent. Otherwise preserve radix bit order.
