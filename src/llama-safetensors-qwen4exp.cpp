@@ -139,7 +139,7 @@ source_spec bind_decoder_source(
         const llama_safetensors_quant_adapters & quant,
         llama_safetensors_source_name source,
         std::vector<transform_kind> transforms = {}) {
-    source_spec result;
+    source_spec result{};
     if (source.quant_role) {
         result = bind_projection(quant, source.module, *source.quant_role, source.source);
     } else {
@@ -186,12 +186,12 @@ source_spec map_target(
         }
     }
     if (target == "per_layer_token_embd.weight") {
-        source_spec result;
+        source_spec result{};
         result.ple_table = true;
         return result;
     }
     if (target == "per_layer_token_embd.scale") {
-        source_spec result;
+        source_spec result{};
         result.ple_scale = true;
         return result;
     }
@@ -263,7 +263,7 @@ source_spec map_target(
     const bool split_experts = registry.find(prefix + "mlp.experts.0.gate_proj.weight") != nullptr ||
                                quant.applies(prefix + "mlp.experts.0.gate_proj");
     const auto bind_split_experts = [&](const char * projection) {
-        source_spec result;
+        source_spec result{};
         const std::string first_module = prefix + "mlp.experts.0." + projection;
         const bool quantized = quant.applies(first_module);
         for (uint32_t expert = 0; expert < geometry.n_expert; ++expert) {
@@ -325,7 +325,7 @@ source_spec map_target(
         return { down_module };
     }
     const auto exl3_side_stack = [&](const char * projection, llama_safetensors_quant_role role) {
-        source_spec result;
+        source_spec result{};
         for (uint32_t expert = 0; expert < geometry.n_expert; ++expert) {
             const std::string module = prefix + "mlp.experts." + std::to_string(expert) + "." + projection;
             auto side = quant.bind(module, role);
@@ -483,7 +483,7 @@ source_spec map_target(
         }};
         for (const recurrent_name & name : recurrent) {
             if (suffix == name.target) {
-                source_spec result;
+                source_spec result{};
                 if (ends_with(name.target, ".weight")) {
                     const std::string module = prefix + std::string(name.source).substr(
                         0, std::string(name.source).size() - std::string_view(".weight").size());
@@ -522,7 +522,7 @@ source_spec map_target(
             if (exl3_fc) {
                 throw unsupported_target(target);
             }
-            source_spec result;
+            source_spec result{};
             result.concat_sources = { "mtp.fc_embedding.weight", "mtp.fc_hidden.weight" };
             return result;
         }
