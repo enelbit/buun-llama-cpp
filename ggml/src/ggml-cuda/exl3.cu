@@ -1,4 +1,5 @@
 // EXL3 (exllamav3) trellis-coded weights: decode gemv, prefill reconstruct + cuBLAS,
+#include "exl3.h"
 // and the 128-block Hadamard input/output transforms.
 // The tile decode and the gemv structure follow exllamav3 (MIT, Copyright (c) 2025 Turboderp):
 // exllamav3_ext/quant/{exl3_gemv_kernel,hadamard_inner,reconstruct}.cu*.
@@ -55,7 +56,7 @@ static bool exl3_sm86_available(int cc) {
 constexpr int EXL3_GEMV_MAX_M = 8;
 
 // tile element order (exllamav3 tensor_core_perm): lane t = idx/8, slot j = idx%8
-__device__ __forceinline__ void exl3_tile_rc(int idx, int & r, int & c) {
+[[maybe_unused]] __device__ __forceinline__ void exl3_tile_rc(int idx, int & r, int & c) {
     const int t = idx >> 3;
     const int j = idx & 7;
     r = (t & 3) * 2 + (j & 1) + ((j & 2) ? 8 : 0);   // k within the tile
