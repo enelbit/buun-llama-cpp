@@ -168,9 +168,25 @@ void llama_kv_split::worker_main() {
 }
 
 void llama_kv_split::split_layer(int32_t ikv, uint32_t n_rows, uint32_t n_tok) {
+    if (ikv < 0 || (uint32_t)ikv >= layers.size()) {
+        return;
+    }
     const auto & li = layers[ikv];
     ggml_tensor * K = li.k;
     ggml_tensor * V = li.v;
+    if (K == nullptr || V == nullptr || split_q == nullptr || split_out == nullptr || split_lse == nullptr) {
+        return;
+    }
+    const uint32_t k_rows = K->ne[1] > 0 ? static_cast<uint32_t>(K->ne[1]) : 0;
+    const uint32_t v_rows = V->ne[1] > 0 ? static_cast<uint32_t>(V->ne[1]) : 0;
+    const uint32_t max_kv_rows = std::min(k_rows, v_rows);
+    n_rows = std::min(n_rows, max_kv_rows);
+    if (max_tok > 0) {
+        n_tok = std::min(n_tok, max_tok);
+    }
+    if (n_rows == 0 || n_tok == 0) {
+        return;
+    }
 
     ggml_init_params params = {
         /*.mem_size   =*/ 32*ggml_tensor_overhead() + ggml_graph_overhead_custom(16, false),

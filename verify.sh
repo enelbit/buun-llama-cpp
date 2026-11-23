@@ -120,9 +120,8 @@ for BIN in llama-server llama-bench; do
     fi
 done
 
-# Guardar log con timestamp
-cp "$LOG_FILE" "$PROJECT_DIR/build-log-$(date +%Y%m%d-%H%M%S).log"
-info "Log guardado: build-log-$(date +%Y%m%d-%H%M%S).log"
+# Mantener log completo en /tmp para no ensuciar el repositorio
+info "Log completo en: $LOG_FILE"
 
 # ═══════════════════════════════════════════════════════════════
 # SECCIÓN 2: ANÁLISIS DE WARNINGS Y ERRORES (CATEGORIZADO)
@@ -499,44 +498,13 @@ if [ -f "$BUILD_DIR/bin/llama-server" ]; then
 fi
 
 # ═══════════════════════════════════════════════════════════════
-# SECCIÓN 9: UNIDAD SYSTEMD
+# SECCIÓN 9: PROTECCIÓN DE SERVICIOS Y PLANTILLA OPCIONAL
 # ═══════════════════════════════════════════════════════════════
-header "SECCIÓN 9: UNIDAD SYSTEMD (opcional)"
+header "SECCIÓN 9: PROTECCIÓN DE SERVICIOS (SIN SOBRESCRIBIR)"
 
-SERVICE_FILE="$HOME/.config/systemd/user/llama-pascal.service"
-mkdir -p "$HOME/.config/systemd/user"
-
-cat > "$SERVICE_FILE" << 'EOF'
-[Unit]
-Description=llama-server (kv-stream-pascal, GTX 1060 sm_61)
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=__BUILD_DIR__/bin/llama-server \
-    -m __MODEL__ \
-    -ngl 99 \
-    -c 4096 \
-    -fa on \
-    -lm mmap \
-    --host 127.0.0.1 \
-    --port 8080
-Restart=on-failure
-RestartSec=5
-Environment="CUDA_VISIBLE_DEVICES=0"
-LimitMEMLOCK=infinity
-
-[Install]
-WantedBy=default.target
-EOF
-
-# Reemplazar placeholders
-sed -i "s|__BUILD_DIR__|$BUILD_DIR|g" "$SERVICE_FILE"
-sed -i "s|__MODEL__|/ruta/a/modelo.gguf|g" "$SERVICE_FILE"
-
-ok "Unidad generada: $SERVICE_FILE"
-info "Edita el modelo en la unidad antes de activar."
-info "Activar: systemctl --user daemon-reload && systemctl --user enable --now llama-pascal"
+ok "No se modifica ~/.config/systemd/user/ ni /etc/systemd/system/"
+info "Tu stack de Open WebUI y llama-server estable permanecen intactos."
+info "Si necesitas una unidad de prueba aislada, créala en /tmp o usa puerto dedicado."
 
 # ═══════════════════════════════════════════════════════════════
 # SECCIÓN 10: RESUMEN FINAL
@@ -548,16 +516,20 @@ echo -e "  ${BOLD}GPU: ${NC}$GPU_NAME (sm_${GPU_ARCH}, ${GPU_VRAM} MB)"
 echo -e "  ${BOLD}Driver: ${NC}$DRIVER_VER"
 echo -e "  ${BOLD}CUDA Toolkit: ${NC}$(nvcc --version 2>/dev/null | grep 'release' | awk '{print $NF}' | tr -d ',')"
 echo -e "  ${BOLD}Build: ${NC}$([ $BUILD_EXIT -eq 0 ] && echo "✅ OK" || echo "❌ FALLO")"
+TOTAL_UNIQUES=$(wc -l < "$REPORT_FILE" 2>/dev/null | tr -d ' ')
+TOTAL_UNIQUES=${TOTAL_UNIQUES:-0}
+MISSING_DECL_COUNT=$(grep -ciE "missing-declarations|suggest-attribute=noreturn" /tmp/build-project-warnings.txt 2>/dev/null || true)
+MISSING_DECL_COUNT=${MISSING_DECL_COUNT:-0}
+
 echo -e "  ${BOLD}Errores únicos: ${NC}$TOTAL_ERRORS"
-echo -e "  ${BOLD}Warnings únicos: ${NC}$TOTAL_WARNINGS"
+echo -e "  ${BOLD}Warnings únicos (total / proyecto / vendor): ${NC}$TOTAL_UNIQUES / $PROJECT_COUNT / $VENDOR_COUNT"
+echo -e "  ${BOLD}Avisos missing-declarations / noreturn (proyecto): ${NC}$MISSING_DECL_COUNT"
 echo -e "  ${BOLD}Flash Attention: ${NC}✅ Sí (vec_f32/tile_f32 en Pascal)"
 echo -e "  ${BOLD}FA_ALL_QUANTS: ${NC}$([ -n "$FA_ALL" ] && echo "$FA_ALL" | grep -q "ON" && echo "✅ ON" || echo "⚠️ OFF")"
 echo ""
-
-# Guardar reporte
-cp "$REPORT_FILE" "$PROJECT_DIR/build-report-$(date +%Y%m%d-%H%M).txt" 2>/dev/null
-info "Reporte: build-report-$(date +%Y%m%d-%H%M).txt"
-info "Log completo: build-log-$(date +%Y%m%d-%H%M%S).log"
+info "Reporte en: $REPORT_FILE"
+info "Warnings de proyecto en: /tmp/build-project-warnings.txt"
+info "Log completo en: $LOG_FILE"
 
 echo ""
 echo -e "${BOLD}══════════════════════════════════════════════════════════${NC}"

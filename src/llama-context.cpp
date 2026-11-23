@@ -6212,9 +6212,14 @@ ggml_status llama_context::graph_compute(
                     const uint32_t n_rows = static_cast<uint32_t>(n_kv_total - max_ring_rows);
                     const int n_nodes = ggml_graph_n_nodes(gf);
                     ggml_tensor * node0 = n_nodes > 0 ? ggml_graph_node(gf, 0) : nullptr;
-                    const uint32_t n_tok  = static_cast<uint32_t>(std::max<int64_t>(1, node0 ? node0->ne[1] : 1));
+                    uint32_t n_tok = static_cast<uint32_t>(std::max<int64_t>(1, node0 ? node0->ne[1] : 1));
+                    if (kv_split->max_tok > 0 && n_tok > kv_split->max_tok) {
+                        n_tok = kv_split->max_tok;
+                    }
                     auto * mutable_split = const_cast<llama_kv_split *>(kv_split);
-                    mutable_split->submit(n_rows, n_tok);
+                    if (n_rows > 0 && n_tok > 0) {
+                        mutable_split->submit(n_rows, n_tok);
+                    }
                     const int32_t active_tag = static_cast<int32_t>(mutable_split->tag);
                     for (int i = 0; i < n_nodes; ++i) {
                         ggml_tensor * node = ggml_graph_node(gf, i);
