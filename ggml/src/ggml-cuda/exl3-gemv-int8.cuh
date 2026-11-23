@@ -1026,7 +1026,9 @@ __global__ void __launch_bounds__(THREADS) gemv_int8_kernel(const uint8_t * __re
                 continue;
             }
 #pragma unroll
+#pragma nv_diag_suppress 128
             for (int j = 0; j < 8; ++j) { wA[j] *= 0x83DCD12Du; wB[j] *= 0x83DCD12Du; }
+#pragma nv_diag_default 128
             const uint32_t * as_kb = sh_as + (kb << 4);
 #pragma unroll
             for (int p = 0; p < NACC; ++p) {
