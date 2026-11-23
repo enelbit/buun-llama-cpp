@@ -343,10 +343,10 @@ uint64_t llama_memory_vbr_preflight_tree::domain_comparison_count() const noexce
     return domain_comparison_count_;
 }
 
-[[noreturn]] void llama_memory_i::state_write_range(llama_io_write_i & /*io*/, llama_seq_id /*seq_id*/, llama_pos /*p0*/, llama_pos /*p1*/) const {
+void llama_memory_i::state_write_range(llama_io_write_i & /*io*/, llama_seq_id /*seq_id*/, llama_pos /*p0*/, llama_pos /*p1*/) const {
     throw std::runtime_error("this memory type has no position-range state");
 }
 
-[[noreturn]] void llama_memory_i::state_append_range(llama_io_read_i & /*io*/, llama_seq_id /*seq_id*/, llama_pos /*p0*/, llama_pos /*p1*/, llama_pos /*p_limit*/) {
+void llama_memory_i::state_append_range(llama_io_read_i & /*io*/, llama_seq_id /*seq_id*/, llama_pos /*p0*/, llama_pos /*p1*/, llama_pos /*p_limit*/) {
     throw std::runtime_error("this memory type has no position-range state");
 }
