@@ -77,7 +77,7 @@ target_spec projection(
         const llama_safetensors_quant_adapters & quant,
         std::string module,
         llama_safetensors_quant_role role = llama_safetensors_quant_role::WEIGHT) {
-    target_spec result;
+    target_spec result{};
     result.quant = bind_quant(quant, module, role);
     result.source = result.quant ? result.quant->primary : module +
         (role == llama_safetensors_quant_role::WEIGHT ? ".weight" : ".scale");
@@ -86,7 +86,7 @@ target_spec projection(
 
 // EXL3 input signs exist only for quantized projections; no plain fallback source
 target_spec input_scale(const llama_safetensors_quant_adapters & quant, const std::string & module) {
-    target_spec result;
+    target_spec result{};
     result.quant = bind_quant(quant, module, llama_safetensors_quant_role::INPUT_SCALE);
     if (result.quant) result.source = result.quant->primary;
     return result;
@@ -98,7 +98,7 @@ target_spec slice_stack(
         const llama_safetensors_registry & registry,
         const std::string & module,
         llama_safetensors_quant_role role) {
-    target_spec result;
+    target_spec result{};
     for (uint32_t slice = 0;; ++slice) {
         const std::string name = module + ".slice." + std::to_string(slice);
         if (registry.find(name + ".trellis") == nullptr) break;
@@ -225,7 +225,7 @@ target_spec map_target(
         const std::string base = expert_targets[projection_index];
         const char expert_projection = char('1' + projection_index);
         if (suffix == base + ".weight") {
-            target_spec result;
+            target_spec result{};
             result.kind = target_kind::EXPERTS;
             result.source = prefix;
             result.layer = layer;
@@ -242,7 +242,7 @@ target_spec map_target(
         // expert 0 stands for the bank, as in describe()
         const auto weight = bind_quant(quant, module_of(0), llama_safetensors_quant_role::WEIGHT);
         if (!weight || !ggml_type_is_exl3(weight->target_type)) return {};
-        target_spec result;
+        target_spec result{};
         for (uint32_t expert = 0; expert < n_expert; ++expert) {
             const std::string module = module_of(expert);
             auto side = bind_quant(quant, module, role);
