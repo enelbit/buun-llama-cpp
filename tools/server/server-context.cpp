@@ -7127,8 +7127,8 @@ private:
         server_slot * slot = nullptr;
         json status;
         // what the slot is established with once the import brought the rows
-        server_tokens tokens;
-        std::vector<uint8_t> tail;
+        server_tokens tokens{};
+        std::vector<uint8_t> tail{};
     };
 
     // One entry into one slot; the slot keeps the outcome for /slots. An artifact brings the
