@@ -1,5 +1,4 @@
 // EXL3 (exllamav3) trellis-coded weights: decode gemv, prefill reconstruct + cuBLAS,
-#include "exl3.h"
 // and the 128-block Hadamard input/output transforms.
 // The tile decode and the gemv structure follow exllamav3 (MIT, Copyright (c) 2025 Turboderp):
 // exllamav3_ext/quant/{exl3_gemv_kernel,hadamard_inner,reconstruct}.cu*.
@@ -42,6 +41,12 @@
 #endif
 
 namespace {
+    int exl3_int8_mode();
+    bool exl3_int8_applicable(int, int, int, int, int);
+    bool exl3_mul_mat_id_fast_shape(const ggml_tensor*);
+    int* exl3_int8_counters(ggml_backend_cuda_context&);
+    void exl3_int8_geometry(int, int, int, int, int, int, size_t, int&, int&, size_t&);
+    size_t exl3_int8_smem_cap(int);
 
 using exl3::FragB;
 using exl3::FragC_h;

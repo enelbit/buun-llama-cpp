@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstddef>
 
+extern "C" {
 void* dflash_cross_ring_gpu_alloc(int, int, int);
 void  dflash_cross_ring_gpu_free(void*);
 void  dflash_cross_ring_gpu_write(void*, int, int, const float*, int, int);
@@ -14,3 +15,4 @@ void  dflash_crosskv_free(void*);
 void  dflash_crosskv_write(void*, int, int, int, const void*, int);
 void  dflash_crosskv_sync();
 void  dflash_crosskv_read_window(void*, int, int, int, int, void*, size_t);
+}
