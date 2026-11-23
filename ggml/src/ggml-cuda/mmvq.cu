@@ -2085,6 +2085,7 @@ static __global__ void mul_mat_vec_q_moe(
         const uint32_t stride_channel_x, const uint32_t stride_channel_y, const uint32_t stride_channel_dst,
         const uint32_t ncols_dst, const uint32_t ids_stride,
         const float up_min, const float up_max, const float gate_min, const float gate_max) {
+    (void)stride_col_dst;
     const void    * GGML_CUDA_RESTRICT vx  = vx_ptr;
     const void    * GGML_CUDA_RESTRICT vy  = vy_ptr;
     const int32_t * GGML_CUDA_RESTRICT ids = ids_ptr;
