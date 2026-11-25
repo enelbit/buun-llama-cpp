@@ -1,3 +1,33 @@
+# kv-stream-pascal (Extended `buun-llama-cpp` Fork)
+
+> **Long-context KV-Cache PCIe Streaming, Hybrid CPU+GPU Split Attention, Native `turbo8` Streaming, and Pascal (`sm_61`) + Multi-Architecture Support.**
+
+Built on top of [spiritbuun/buun-llama-cpp](https://github.com), this fork enables **131K–262K context windows** with **MTP speculative decoding** on VRAM-constrained GPUs (such as **6 GB NVIDIA GTX 1060 `sm_61`**) without OOM errors.
+
+## What Is New in This Fork
+
+- **Asynchronous PCIe KV-Stream Ring (`--kv-stream-stage-mib`):** Streams KV pages on demand from pinned host RAM through a bounded VRAM staging ring (`64 MiB`–`512 MiB`), keeping large contexts (`262,144` tokens) under strict VRAM budgets (`<= 5.2 GB`).
+- **CPU+GPU Split Attention with Log-Sum-Exp Fusion:** When active context rows exceed the resident GPU ring (`n_kv_total > max_ring_rows`), a parallel CPU `ggml_flash_attn_ext` worker computes attention over spilled host pages while the GPU merges partial outputs and LSE scalars seamlessly.
+- **Native `turbo8` (`GGML_TYPE_TURBO8_0`) Direct & Partial Attention:** Enables native fused partial attention for `turbo8` inside `kv-stream` without intermediate `f16` conversion overhead.
+- **Unified `--fit-budget` & `--kv-stream-stage-mib` Accounting:** Deducts staging + conversion VRAM headroom (`stage_mib + 32 MiB`) and validates host pinned RAM before layer placement, reporting exact MiB shortfalls and preserving CPU AVX2/FMA weight repacking when `--moe-cache` is inactive on `sm_61`.
+- **Hybrid Gated DeltaNet (`Qwen3.5` / `Qwen3.6` / `Qwen3.8`) + Bounded `draft-mtp`:** Guards split-attention dispatch to attention layers (`n_kv_head > 0`) while keeping recurrent `ssm_states` in VRAM, and bounds `create_mtp_context()` (`n_ctx <= 32768`, bounded batch, zero duplicate KV stream) so MTP speculation runs without second-context OOMs.
+
+## Documentation & Guides
+
+- **[Dense vs. MoE Command & `models.ini` Guide](docs/COMMANDS-DENSE-VS-MOE.md):** Complete CLI and `models.ini` reference separating Dense/Hybrid models from MoE models, including flag interaction rules.
+- **[Benchmarks & Validation Test Suite](docs/BENCHMARKS-AND-TESTS.md):** Reproducible 2000-token stress tests, split-attention overflow results, and VRAM/speed measurements.
+
+## Multi-Platform Hardware Compatibility Matrix
+
+| Feature | NVIDIA (`sm_61+` Pascal to Ada/Blackwell) | NVIDIA (`sm_60` GP100) | AMD (`gfx1010+` RDNA1–RDNA4 via ROCm/HIP) | Intel (Arc A/B+ via SYCL) |
+|---|---|---|---|---|
+| **`kv-stream` DMA Ring** | **Supported & Verified** (`cudaMallocHost` + async copy) | **Supported** (no HW `__dp4a`, uses scalar fallback) | **Portable via HIP** (requires `hipHostMallocCoherent \| hipHostMallocMapped` for host-device flags) | **Pending backend port** (`ggml-sycl` needs `sycl::malloc_host` staging) |
+| **`split attention` (CPU+GPU LSE)** | **Supported & Verified** (`fattn-split-kernels.cuh` + `ggml-cpu`) | **Supported** | **Portable via HIP** (`__threadfence_system()` + Wave32; scale `clock64()` timeout) | **Pending backend port** (port 4 `kv_split_*` kernels with `sycl::atomic_ref` system scope) |
+| **`turbo8` / `turbo4` / `TCQ` KV** | **Supported & Verified** (`__dp4a` on `sm_61+`, MMA on `sm_70+`) | **Functional** (emulated dot product) | **Supported on RDNA2/3/4** (`gfx1030+`; RDNA1 `gfx1010` uses scalar fallback) | **Not yet ported** (`ggml-sycl` uses `q8_0`/`q4_0`) |
+| **Build Command** | `-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES="61;75;86;89" -DGGML_CUDA_FA_ALL_QUANTS=ON` | `-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=60` | `-DGGML_HIP=ON -DAMDGPU_TARGETS=gfx1100` | `-DGGML_SYCL=ON` (CPU + `q8_0` KV) |
+
+---
+
 # buun-llama-cpp
 
 ![buunslamma](buunslamma.png)
