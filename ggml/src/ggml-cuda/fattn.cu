@@ -895,6 +895,9 @@ static kv_stream_native_partial_fn kv_stream_resolve_turbo_partial_for_v(ggml_ty
         case GGML_TYPE_TURBO4_0:
             return &ggml_cuda_flash_attn_ext_vec_partial_case<
                 D, type_K, GGML_TYPE_TURBO4_0>;
+        case GGML_TYPE_TURBO8_0:
+            return &ggml_cuda_flash_attn_ext_vec_partial_case<
+                D, type_K, GGML_TYPE_TURBO8_0>;
         default:
             return nullptr;
     }
@@ -907,12 +910,12 @@ static kv_stream_native_partial_fn kv_stream_resolve_native_partial_dim(
         case type_K: return kv_stream_resolve_native_partial_for_v<D, type_K>(type_v)
     switch (type_k) {
         case GGML_TYPE_F16:
-            if (type_v == GGML_TYPE_TURBO2_0 || type_v == GGML_TYPE_TURBO3_0 || type_v == GGML_TYPE_TURBO4_0) {
+            if (type_v == GGML_TYPE_TURBO2_0 || type_v == GGML_TYPE_TURBO3_0 || type_v == GGML_TYPE_TURBO4_0 || type_v == GGML_TYPE_TURBO8_0) {
                 return kv_stream_resolve_turbo_partial_for_v<D, GGML_TYPE_F16>(type_v);
             }
             return kv_stream_resolve_native_partial_for_v<D, GGML_TYPE_F16>(type_v);
         case GGML_TYPE_Q8_0:
-            if (type_v == GGML_TYPE_TURBO2_0 || type_v == GGML_TYPE_TURBO3_0 || type_v == GGML_TYPE_TURBO4_0) {
+            if (type_v == GGML_TYPE_TURBO2_0 || type_v == GGML_TYPE_TURBO3_0 || type_v == GGML_TYPE_TURBO4_0 || type_v == GGML_TYPE_TURBO8_0) {
                 return kv_stream_resolve_turbo_partial_for_v<D, GGML_TYPE_Q8_0>(type_v);
             }
             return kv_stream_resolve_native_partial_for_v<D, GGML_TYPE_Q8_0>(type_v);
@@ -922,6 +925,8 @@ static kv_stream_native_partial_fn kv_stream_resolve_native_partial_dim(
             return kv_stream_resolve_turbo_partial_for_v<D, GGML_TYPE_TURBO3_0>(type_v);
         case GGML_TYPE_TURBO4_0:
             return kv_stream_resolve_turbo_partial_for_v<D, GGML_TYPE_TURBO4_0>(type_v);
+        case GGML_TYPE_TURBO8_0:
+            return kv_stream_resolve_turbo_partial_for_v<D, GGML_TYPE_TURBO8_0>(type_v);
         KV_STREAM_NATIVE_K_CASE(GGML_TYPE_Q4_0);
         KV_STREAM_NATIVE_K_CASE(GGML_TYPE_Q4_1);
         KV_STREAM_NATIVE_K_CASE(GGML_TYPE_Q5_0);
@@ -1058,6 +1063,7 @@ ggml_backend_cuda_kv_stream_get_type_capabilities(ggml_type type) {
         case GGML_TYPE_TURBO2_0:
         case GGML_TYPE_TURBO3_0:
         case GGML_TYPE_TURBO4_0:
+        case GGML_TYPE_TURBO8_0:
             result.direct_attention = true;
             break;
         default:
