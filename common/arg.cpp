@@ -1676,7 +1676,10 @@ static bool common_params_parse_ex(int argc, char ** argv, common_params_context
     // parse all CLI args now, so that -hf is available below for remote preset resolution
     parse_cli_args();
 
-    if ((params.moe_cache.mode == COMMON_MOE_CACHE_MODE_ON || params.moe_cache.no_repack) &&
+    if (params.tensor_buft_overrides.size() > 1 && std::any_of(params.tensor_buft_overrides.begin(), params.tensor_buft_overrides.end(), [](const auto & o) { return o.pattern != nullptr && std::strstr(o.pattern, "exps") != nullptr; })) {
+        LOG_WRN("both `--override-tensor` and `--n-cpu-moe`/`--cpu-moe` are set; tensor overrides are matched in order (place specific `-ot` patterns before `-ncmoe`)\n");
+    }
+    if (params.moe_cache.no_repack &&
         !params.no_extra_bufts) {
         LOG_INF("MoE cache on or a fixed budget disables weight repacking\n");
         params.no_extra_bufts = true;

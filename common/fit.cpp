@@ -1890,7 +1890,7 @@ static void common_params_fit_impl(
     }
     if (cparams != nullptr && cparams->kv_stream_stage_mib > 0 && (mparams == nullptr || mparams->n_gpu_layers != 0) && nd > 0) {
         const size_t jd = (mparams != nullptr && mparams->main_gpu >= 0 && (size_t)mparams->main_gpu < nd) ? (size_t)mparams->main_gpu : 0;
-        const int64_t req = ((int64_t)cparams->kv_stream_stage_mib + 32) * MiB;
+        const int64_t req = (std::max<int64_t>(cparams->kv_stream_stage_mib, 64) + 32) * MiB;
         if (targets[jd] < req) {
             const int64_t miss = (req - std::max<int64_t>(0, targets[jd]) + MiB - 1) / MiB;
             LOG_WRN("%s: kv-stream stage+conv shortfall on %s: missing %" PRId64 " MiB\n", __func__, dev_names[jd].c_str(), miss);
