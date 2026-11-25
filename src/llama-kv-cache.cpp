@@ -1292,9 +1292,9 @@ llama_kv_cache::llama_kv_cache(
                     kv_stream_stage_bytes_stored = kv_stream_stage_bytes;
                     const uint32_t split_max_tok = std::max<uint32_t>(256, std::min<uint32_t>(kv_stream_max_pages() * 256u, 4096));
                     const size_t n_lay = hparams.n_layer();
-                    const size_t q_sz  = (((n_lay * split_max_tok * 4u * 128u * sizeof(float)) + 255u) & ~size_t(255u));
+                    const size_t q_sz  = (((n_lay * split_max_tok * std::max<size_t>(4u, hparams.n_head(il)) * std::max<size_t>(128u, hparams.n_embd_head_k(il)) * sizeof(float)) + 255u) & ~size_t(255u));
                     const size_t out_sz = q_sz;
-                    const size_t lse_sz = (((n_lay * split_max_tok * 4u * sizeof(float)) + 255u) & ~size_t(255u));
+                    const size_t lse_sz = (((n_lay * split_max_tok * std::max<size_t>(4u, hparams.n_head(il)) * sizeof(float)) + 255u) & ~size_t(255u));
                     const size_t flg_sz = (((2u * n_lay * sizeof(uint32_t)) + 255u) & ~size_t(255u));
                     const size_t total_pinned = q_sz + out_sz + lse_sz + flg_sz;
 
@@ -1303,6 +1303,8 @@ llama_kv_cache::llama_kv_cache(
                         if (kv_alloc_host_pinned(&pinned_tmp, total_pinned) && pinned_tmp != nullptr) {
                             kv_split_pinned_ptr = pinned_tmp;
                             kv_split_pinned_size = total_pinned;
+                        } else {
+                            LLAMA_LOG_WARN("%s: host pinned shortfall: missing %zu MiB\n", __func__, (size_t)((total_pinned + (1024ULL * 1024ULL) - 1ULL) / (1024ULL * 1024ULL)));
                         }
                     }
 

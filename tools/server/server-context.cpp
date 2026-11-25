@@ -8553,6 +8553,12 @@ private:
         cparams.type_k        = params_base.speculative.draft.cache_type_k;
         cparams.type_v        = params_base.speculative.draft.cache_type_v;
         cparams.n_rs_seq      = 0;
+        const uint32_t mtp_batch = std::max<uint32_t>(32u, (uint32_t)std::max(1, params_base.speculative.draft.n_max) * 4u);
+        cparams.n_ctx         = std::min<uint32_t>(cparams.n_ctx, 32768u);
+        cparams.n_batch       = std::min<uint32_t>(cparams.n_batch, mtp_batch);
+        cparams.n_ubatch      = std::min<uint32_t>(cparams.n_ubatch, mtp_batch);
+        cparams.kv_stream_stage_mib = 0;
+        cparams.offload_kqv   = false;
         cparams.n_outputs_max = params_base.n_parallel;
         cparams.ctx_other     = ctx_tgt;
         return llama_init_from_model(model_tgt, cparams);

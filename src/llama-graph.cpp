@@ -3395,9 +3395,10 @@ ggml_tensor * llm_graph_context::build_attn_mha(
 
         // Split attention: GPU only attends rows in VRAM
         if (n_kv_max == 0) {
-            const auto * kv_ctx = static_cast<const llama_kv_cache_context *>(mctx);
-            const auto * kv_split = kv_ctx->kv_split();
-            if (kv_split != nullptr) {
+            if (mctx != nullptr) {
+                            const auto * kv_ctx = dynamic_cast<const llama_kv_cache_context *>(mctx);
+                            const auto * kv_split = kv_ctx ? kv_ctx->kv_split() : nullptr;
+                            if (kv_split != nullptr && kv_split->n_layer > 0) {
                 const uint32_t max_pages = kv_ctx->kv_stream_max_pages();
                 if (max_pages > 0) {
                     const int64_t max_ring_rows = (int64_t)max_pages * 256;
@@ -3420,6 +3421,7 @@ ggml_tensor * llm_graph_context::build_attn_mha(
                             }
                         }
                     }
+            }
                 }
             }
         }
